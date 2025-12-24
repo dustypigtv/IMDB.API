@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="IMDB.API.ApiService/IMDB.API.ApiService.csproj" />
+  <Project Path="IMDB.API.AppHost/IMDB.API.AppHost.csproj" />
+  <Project Path="IMDB.API.ServiceDefaults/IMDB.API.ServiceDefaults.csproj" />
+</Solution>

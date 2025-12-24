@@ -1,0 +1,36 @@
+@ApiService_HostAddress = http://localhost:5437
+
+
+GET {{ApiService_HostAddress}}/api/gettitle/tt6083374
+Accept: application/json
+
+
+
+###
+
+
+
+GET {{ApiService_HostAddress}}/api/getperson/nm9899151
+Accept: application/json
+
+
+
+###
+
+
+
+GET {{ApiService_HostAddress}}/api/searchtitle?query=The+Avengers&titleType=movie&year=2012
+Accept: application/json
+
+
+
+###
+
+
+
+GET {{ApiService_HostAddress}}/api/searchperson?query=Chris+Evans&primaryProfession=actor
+Accept: application/json
+
+
+
+###
