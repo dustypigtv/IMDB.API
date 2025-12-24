@@ -13,7 +13,7 @@ var seq = builder
 
 var postgresdb = builder
     .AddPostgres("postgres")
-    //.WithPgAdmin_MyVersion()
+    //.WithPgAdmin()
     .WithPgAdmin_MyVersion()
     .WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent)
