@@ -1,3 +1,6 @@
+using Aspire.Hosting;
+using IMDB.API.AppHost;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var env = builder.AddDockerComposeEnvironment("env");
@@ -10,10 +13,14 @@ var seq = builder
 
 var postgresdb = builder
     .AddPostgres("postgres")
-    .WithPgAdmin()
+    //.WithPgAdmin_MyVersion()
+    .WithPgAdmin_MyVersion()
     .WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent)
     .AddDatabase("imdb-dumps");
+
+
+var privilegedApiKey = builder.AddParameter("privileged-api-key");
 
 var apiService = builder
     .AddProject<Projects.IMDB_API_ApiService>("apiservice")
@@ -21,6 +28,7 @@ var apiService = builder
     .WithReference(postgresdb)
     .WaitFor(postgresdb)
     .WithReference(seq)
-    .WaitFor(seq);
+    .WaitFor(seq)
+    .WithEnvironment("PRIVILEGED_API_KEY", privilegedApiKey);
 
 builder.Build().Run();

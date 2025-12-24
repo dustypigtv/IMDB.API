@@ -15,4 +15,6 @@ public class Title
     public List<TitlePrincipal>? Principals { get; set; }
 
     public List<TitleEpisode>? Episodes { get; set; }
+
+    public ExternalData? ExternalData { get; set; }
 }

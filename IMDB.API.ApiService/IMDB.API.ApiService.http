@@ -34,3 +34,27 @@ Accept: application/json
 
 
 ###
+
+
+
+GET {{ApiService_HostAddress}}/api/NextExternalToFind?privilegedApiKey=debug-test
+Accept: application/json
+
+
+###
+
+
+POST {{ApiService_HostAddress}}/api/UpdateExternalData?privilegedApiKey=debug-test
+Content-Type: application/json
+
+{
+  "tConst": "tt0000001",
+  "date": "1984-03-10",
+  "plot": "Performing on what looks like a small wooden stage, wearing a dress with a hoop skirt and white high-heeled pumps, Carmencita does a dance with kicks and twirls, a smile always on her face.",
+  "imageUrl": "https://m.media-amazon.com/images/M/MV5BMDcxOGEwNTktZTA0Yi00ZTFlLTkxNTItM2M2MmY0YTI2MTBhXkEyXkFqcGc@._V1_QL75_UY281_CR2,0,190,281_.jpg",
+  "mpaaRating": null
+}
+
+
+
+###

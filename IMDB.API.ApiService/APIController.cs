@@ -3,6 +3,7 @@ using IMDB.API.ApiService.Data.Models;
 using IMDB.API.ApiService.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace IMDB.API.ApiService;
@@ -14,6 +15,9 @@ namespace IMDB.API.ApiService;
 public class APIController(AppDbContext db) : ControllerBase
 {
     private const int MAX_SEARCH_RESULTS = 1_000;
+    
+    public const string PRIVILEGED_KEY_NAME = "PRIVILEGED_API_KEY";
+    private readonly string _privilegedKey = Environment.GetEnvironmentVariable(PRIVILEGED_KEY_NAME) + string.Empty;
 
     [HttpGet("{ttId}")]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(Title))]
@@ -65,6 +69,12 @@ public class APIController(AppDbContext db) : ControllerBase
         if (episodes.Count == 0)
             episodes = null;
 
+
+        var externalData = await db.ExternalData
+            .AsNoTracking()
+            .Where(_ => _.TConst == ttId)
+            .FirstOrDefaultAsync();
+
         var ret = new Title
         {
             Akas = akas,
@@ -72,7 +82,8 @@ public class APIController(AppDbContext db) : ControllerBase
             Crew = titleCrew,
             Episodes = episodes,
             Principals = principals,
-            Rating = titleRating
+            Rating = titleRating,
+            ExternalData = externalData
         };
 
         return Ok(ret);
@@ -178,4 +189,87 @@ public class APIController(AppDbContext db) : ControllerBase
 
         return Ok(ret.Select(_ => _.Val));
     }
+
+
+    /// <summary>
+    /// This endpoint isn't for public use
+    /// </summary>
+    [HttpGet]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    public async Task<ActionResult<ExternalData>> NextExternalToFind(string privilegedApiKey)
+    {
+        if (!_privilegedKey.HasValue())
+            throw new Exception(PRIVILEGED_KEY_NAME + " environment variable not set");
+
+        if (_privilegedKey != privilegedApiKey)
+            return new StatusCodeResult(StatusCodes.Status401Unauthorized);
+
+
+        var q = from tb in db.TitleBasics
+                join tr in db.TitleRatings on tb.TConst equals tr.TConst into lj1
+                from tr in lj1.DefaultIfEmpty()
+                join ed in db.ExternalData on tb.TConst equals ed.TConst into lj2
+                from ed in lj2.DefaultIfEmpty()
+                select new
+                {
+                    TitleBasic = tb,
+                    NumVotes = tr == null ? 0 : tr.NumVotes,
+                    ExternalData = ed,
+                    LastUpdated = ed == null ? DateTime.MinValue : ed.LastUpdated
+                };
+
+        var queryResponse = await q
+            .OrderByDescending(_ => _.NumVotes)
+            .ThenBy(_ => _.LastUpdated)
+            .ThenBy(_ => _.TitleBasic.TConst)
+            .FirstOrDefaultAsync();
+
+        if(queryResponse == null)
+            return NotFound();
+
+        var ret = queryResponse.ExternalData ?? new ExternalData { TConst = queryResponse.TitleBasic.TConst };
+        return Ok(ret);
+    }
+
+
+    /// <summary>
+    /// This endpoint isn't for public use
+    /// </summary>
+    [HttpPost]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    public async Task<ActionResult> UpdateExternalData(string privilegedApiKey, ExternalData externalData)
+    {
+        if (!_privilegedKey.HasValue())
+            throw new Exception(PRIVILEGED_KEY_NAME + " environment variable not set");
+
+        if (_privilegedKey != privilegedApiKey)
+            return new StatusCodeResult(StatusCodes.Status401Unauthorized);
+
+
+        if (!externalData.TConst.HasValue())
+            throw new ArgumentNullException(nameof(externalData.TConst));
+
+        var entity = await db.ExternalData
+            .Where(_ => _.TConst == externalData.TConst)
+            .FirstOrDefaultAsync();
+
+        if (entity == null)
+        {
+            entity = db.ExternalData.Add(externalData).Entity;
+        }
+        else
+        {
+            entity.Date = externalData.Date ?? entity.Date;
+            entity.ImageUrl = externalData.ImageUrl.HasValue() ? externalData.ImageUrl : entity.ImageUrl;
+            entity.MPAA_Rating = externalData.MPAA_Rating.HasValue() ? externalData.MPAA_Rating : entity.MPAA_Rating;
+            entity.Plot = externalData.Plot.HasValue() ? externalData.Plot : entity.Plot;
+        }
+
+        entity.LastUpdated = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        return Ok();
+    }
+
+
 }

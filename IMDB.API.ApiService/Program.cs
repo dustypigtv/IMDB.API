@@ -52,11 +52,6 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
-//if (app.Environment.IsDevelopment())
-//{
-//    app.MapOpenApi();
-//}
-
 app.MapOpenApi();
 app.UseSwaggerUI(options =>
 {
