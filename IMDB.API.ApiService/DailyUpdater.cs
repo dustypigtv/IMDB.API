@@ -375,7 +375,7 @@ public class DailyUpdater : IHostedService
 
 
 #if !DEBUG
-        file.TryDelete();    
+        tmpFile.TryDelete();    
 #endif
 
 
