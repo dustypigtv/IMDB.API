@@ -20,8 +20,6 @@ builder.AddNpgsqlDbContext<AppDbContext>("imdb-dumps", c =>
 });
 
 
-builder.AddFileStore("tsvdata");
-
 
 // Add services to the container.
 builder.Services.AddProblemDetails();

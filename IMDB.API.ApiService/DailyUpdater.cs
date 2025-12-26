@@ -18,7 +18,6 @@ public class DailyUpdater : IHostedService
     private const int ONE_SECOND = 1_000;
     private const int ONE_DAY = ONE_SECOND * 60 * 60 * 24;
 
-    private readonly FileStore _tsvData;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly CancellationTokenSource _cts = new();
     private readonly CancellationToken _cancellationToken;
@@ -26,10 +25,9 @@ public class DailyUpdater : IHostedService
     private readonly ILogger<DailyUpdater> _logger;
 
     
-    public DailyUpdater([FromKeyedServices("tsvdata")] FileStore tsvData, IServiceScopeFactory serviceScopeFactory, ILogger<DailyUpdater> logger)
+    public DailyUpdater(IServiceScopeFactory serviceScopeFactory, ILogger<DailyUpdater> logger)
     {
         _cancellationToken = _cts.Token;
-        _tsvData = tsvData;
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _timer = new(Tick);
@@ -341,31 +339,24 @@ public class DailyUpdater : IHostedService
 
     private async Task ImportFile<T>(string url, Func<string[], T?> createEntity) where T : class, ICSV
     {
-        var file = new FileInfo(Path.Combine(_tsvData.Path, Path.ChangeExtension(Path.GetFileName(url), null)));
-        await DownloadFile(url, file);
+        var tmpFile = new FileInfo(Path.Combine("/tmp", Path.ChangeExtension(Path.GetFileName(url), null)));
+        await DownloadFile(url, tmpFile);
 
-        var formattedFile = new FileInfo(file.FullName + ".formatted");
+        var formattedFile = new FileInfo(Path.Combine("/tsvdata",  tmpFile.Name));
         formattedFile.TryDelete();
 
 
-        using (TextReader tr = new StreamReader(file.FullName))
+        using (TextReader tr = new StreamReader(tmpFile.FullName))
         {
             //Ignore source headers
             tr.ReadLine();
 
-
-
             using var dstStream = new StreamWriter(formattedFile.FullName);
 
-            //int cnt = 0;
             bool headersDone = false;
             string? line;
             while ((line = tr.ReadLine()) != null)
             {
-                //cnt++;
-                //if (cnt > 10_000)
-                //    break;
-
                 _cancellationToken.ThrowIfCancellationRequested();
 
                 var entity = createEntity(line.Split('\t'));
@@ -411,7 +402,7 @@ public class DailyUpdater : IHostedService
         sb.AppendLine(@$"CREATE TEMP TABLE ""STAGING"" (LIKE ""{tn}"");");
         sb.AppendLine();
 
-        sb.AppendLine(@$"COPY ""STAGING"" FROM '/tsvdata/{formattedFile.Name}' DELIMITER ',' CSV HEADER;");
+        sb.AppendLine(@$"COPY ""STAGING"" FROM '{formattedFile.FullName}' DELIMITER ',' CSV HEADER;");
         sb.AppendLine();
 
         sb.AppendLine(@$"DELETE FROM ""{tn}"" WHERE ({pkNames}) NOT IN (SELECT {pkNames} FROM ""{tn}"");");
@@ -443,7 +434,7 @@ public class DailyUpdater : IHostedService
 #endif
         outputFile.TryDelete();
 
-        var gzFile = new FileInfo(outputFile.FullName + ".gz");
+        var gzFile = new FileInfo(Path.Combine("/tmp", outputFile.Name + ".gz"));
         gzFile.TryDelete();
 
         using var scope = _serviceScopeFactory.CreateScope();
