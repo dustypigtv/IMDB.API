@@ -381,6 +381,7 @@ public class DailyUpdater : IHostedService
 
         using var scope = _serviceScopeFactory.CreateScope();
         using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.SetCommandTimeout(TimeSpan.FromDays(1));
         var tn = db.GetTableName<T>();
         var cols = db.GetColumnNames<T>();
         string colNames = string.Join(", ", cols.Select(_ => $"\"{_}\""));

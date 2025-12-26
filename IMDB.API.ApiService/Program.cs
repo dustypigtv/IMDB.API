@@ -8,14 +8,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.AddSeqEndpoint("seq");
-builder.AddNpgsqlDbContext<AppDbContext>("imdb-dumps", c =>
-{
-    c.CommandTimeout = 1500;
-}, c =>
+builder.AddNpgsqlDbContext<AppDbContext>("imdb-dumps", settings => { }, options =>
 {
 #if DEBUG
-    c.EnableSensitiveDataLogging(true);
-    c.EnableDetailedErrors(true);
+    options.EnableSensitiveDataLogging(true);
+    options.EnableDetailedErrors(true);
 #endif   
 });
 
