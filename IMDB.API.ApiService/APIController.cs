@@ -219,8 +219,8 @@ public class APIController(AppDbContext db) : ControllerBase
                 };
 
         var queryResponse = await q
-            .OrderByDescending(_ => _.NumVotes)
-            .ThenBy(_ => _.LastUpdated)
+            .OrderBy(_ => _.LastUpdated)
+            .ThenByDescending(_ => _.NumVotes)
             .ThenBy(_ => _.TitleBasic.TConst)
             .FirstOrDefaultAsync();
 
