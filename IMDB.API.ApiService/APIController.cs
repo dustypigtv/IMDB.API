@@ -17,6 +17,10 @@ public class APIController(AppDbContext db) : ControllerBase
     private const int MAX_SEARCH_RESULTS = 1_000;
 
     public const string PRIVILEGED_KEY_NAME = "PRIVILEGED_API_KEY";
+
+    static readonly string[] ExternalDataFilter = new string[] { "movie", "tvMovie", "tvSeries", "tvMiniSeries", "tvEpisode" };
+
+
     private readonly string _privilegedKey = Environment.GetEnvironmentVariable(PRIVILEGED_KEY_NAME) + string.Empty;
 
     [HttpGet("{tConst}")]
@@ -191,6 +195,7 @@ public class APIController(AppDbContext db) : ControllerBase
     }
 
 
+    
     /// <summary>
     /// This endpoint isn't for public use
     /// </summary>
@@ -204,8 +209,7 @@ public class APIController(AppDbContext db) : ControllerBase
         if (_privilegedKey != privilegedApiKey)
             return new StatusCodeResult(StatusCodes.Status401Unauthorized);
 
-
-        var q = from tb in db.TitleBasics
+        var q = from tb in db.TitleBasics.Where(_ => ExternalDataFilter.Contains(_.TitleType))
                 join tr in db.TitleRatings on tb.TConst equals tr.TConst into lj1
                 from tr in lj1.DefaultIfEmpty()
                 join ed in db.ExternalData on tb.TConst equals ed.TConst into lj2
