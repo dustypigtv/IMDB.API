@@ -1,8 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text;
 
 namespace IMDB.API.ApiService.Data.Models;
 
-public class TitleRating : IEquatable<TitleRating?>
+public class TitleRating : ICSV
 {
     [Key]
     public required string TConst { get; set; }
@@ -11,31 +12,16 @@ public class TitleRating : IEquatable<TitleRating?>
 
     public int NumVotes { get; set; }
 
-    public override bool Equals(object? obj)
+    public string ToCSV()
     {
-        return Equals(obj as TitleRating);
+        var sb = new StringBuilder();
+
+        sb.AppendCSVField(TConst, true);
+        sb.AppendCSVField(AverageWeighting, true);
+        sb.AppendCSVField(NumVotes, false);
+
+        return sb.ToString();
     }
 
-    public bool Equals(TitleRating? other)
-    {
-        return other is not null &&
-               TConst == other.TConst &&
-               AverageWeighting == other.AverageWeighting &&
-               NumVotes == other.NumVotes;
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(TConst, AverageWeighting, NumVotes);
-    }
-
-    public static bool operator ==(TitleRating? left, TitleRating? right)
-    {
-        return EqualityComparer<TitleRating>.Default.Equals(left, right);
-    }
-
-    public static bool operator !=(TitleRating? left, TitleRating? right)
-    {
-        return !(left == right);
-    }
+    public string ToHeaders() => $"{nameof(TConst)},{nameof(AverageWeighting)},{nameof(NumVotes)}";
 }

@@ -1,10 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 
 namespace IMDB.API.ApiService.Data.Models;
 
 [PrimaryKey(nameof(TConst), nameof(Ordering), nameof(NConst))]
-public class TitlePrincipal : IEquatable<TitlePrincipal?>
+public class TitlePrincipal : ICSV
 {
     [Key]
     public required string TConst { get; set; }
@@ -19,36 +20,19 @@ public class TitlePrincipal : IEquatable<TitlePrincipal?>
 
     public string? Character { get; set; }
 
-    public string DictKey() => $"{TConst}.{Ordering}.{NConst}";
-
-    public override bool Equals(object? obj)
+    public string ToCSV()
     {
-        return Equals(obj as TitlePrincipal);
+        var sb = new StringBuilder();
+
+        sb.AppendCSVField(TConst, true);
+        sb.AppendCSVField(Ordering, true);
+        sb.AppendCSVField(NConst, true);
+        sb.AppendCSVField(Category, true);
+        sb.AppendCSVField(Job, true);
+        sb.AppendCSVField(Character, false);
+
+        return sb.ToString();
     }
 
-    public bool Equals(TitlePrincipal? other)
-    {
-        return other is not null &&
-               TConst == other.TConst &&
-               Ordering == other.Ordering &&
-               NConst == other.NConst &&
-               Category == other.Category &&
-               Job == other.Job &&
-               Character == other.Character;
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(TConst, Ordering, NConst, Category, Job, Character);
-    }
-
-    public static bool operator ==(TitlePrincipal? left, TitlePrincipal? right)
-    {
-        return EqualityComparer<TitlePrincipal>.Default.Equals(left, right);
-    }
-
-    public static bool operator !=(TitlePrincipal? left, TitlePrincipal? right)
-    {
-        return !(left == right);
-    }
+    public string ToHeaders() => $"{nameof(TConst)},{nameof(Ordering)},{nameof(NConst)},{nameof(Category)},{nameof(Job)},{nameof(Character)}";
 }

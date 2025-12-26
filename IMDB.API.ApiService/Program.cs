@@ -8,7 +8,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.AddSeqEndpoint("seq");
-builder.AddNpgsqlDbContext<AppDbContext>("imdb-dumps", c => c.CommandTimeout = 300);
+builder.AddNpgsqlDbContext<AppDbContext>("imdb-dumps", c =>
+{
+    c.CommandTimeout = 1500;
+}, c =>
+{
+#if DEBUG
+    c.EnableSensitiveDataLogging(true);
+    c.EnableDetailedErrors(true);
+#endif   
+});
+
+
+builder.AddFileStore("tsvdata");
 
 
 // Add services to the container.

@@ -17,8 +17,6 @@
 		<PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.1.0" />
 		<PackageReference Include="Aspire.Seq" Version="13.1.0" />
 		<PackageReference Include="DustyPig.SimpleDownloader" Version="3.2.0.18" />
-		<PackageReference Include="EFCore.BulkExtensions.Core" Version="9.0.2" />
-		<PackageReference Include="EFCore.BulkExtensions.PostgreSql" Version="9.0.2" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.1">
 			<PrivateAssets>all</PrivateAssets>

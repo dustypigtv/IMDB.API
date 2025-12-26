@@ -1,8 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text;
 
 namespace IMDB.API.ApiService.Data.Models;
 
-public class TitleCrew : IEquatable<TitleCrew?>
+public class TitleCrew : ICSV
 {
     [Key]
     public required string TConst { get; set; }
@@ -11,31 +12,16 @@ public class TitleCrew : IEquatable<TitleCrew?>
 
     public List<string>? Writers { get; set; }
 
-    public override bool Equals(object? obj)
+    public string ToCSV()
     {
-        return Equals(obj as TitleCrew);
+        var sb = new StringBuilder();
+
+        sb.AppendCSVField(TConst, true);
+        sb.AppendCSVField(Directors, true);
+        sb.AppendCSVField(Writers, false);
+
+        return sb.ToString();
     }
 
-    public bool Equals(TitleCrew? other)
-    {
-        return other is not null &&
-               TConst == other.TConst &&
-               (Directors ?? []).SequenceEqual(other.Directors ?? []) &&
-               (Writers ?? []).SequenceEqual(other.Writers ?? []);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(TConst, Directors, Writers);
-    }
-
-    public static bool operator ==(TitleCrew? left, TitleCrew? right)
-    {
-        return EqualityComparer<TitleCrew>.Default.Equals(left, right);
-    }
-
-    public static bool operator !=(TitleCrew? left, TitleCrew? right)
-    {
-        return !(left == right);
-    }
+    public string ToHeaders() => $"{nameof(TConst)},{nameof(Directors)},{nameof(Writers)}";
 }

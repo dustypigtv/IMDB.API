@@ -1,4 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -10,6 +13,35 @@ namespace IMDB.API.ApiService.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "Config",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    LastUpdate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Config", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ExternalData",
+                columns: table => new
+                {
+                    TConst = table.Column<string>(type: "text", nullable: false),
+                    Date = table.Column<DateOnly>(type: "date", nullable: true),
+                    Plot = table.Column<string>(type: "text", nullable: true),
+                    ImageUrl = table.Column<string>(type: "text", nullable: true),
+                    MPAA_Rating = table.Column<string>(type: "text", nullable: true),
+                    LastUpdated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ExternalData", x => x.TConst);
+                });
+
             migrationBuilder.CreateTable(
                 name: "NameBasics",
                 columns: table => new
@@ -30,7 +62,7 @@ namespace IMDB.API.ApiService.Migrations
                 name: "TitleAkas",
                 columns: table => new
                 {
-                    TitleId = table.Column<string>(type: "text", nullable: false),
+                    TConst = table.Column<string>(type: "text", nullable: false),
                     Ordering = table.Column<int>(type: "integer", nullable: false),
                     Title = table.Column<string>(type: "text", nullable: false),
                     Region = table.Column<string>(type: "text", nullable: true),
@@ -41,7 +73,7 @@ namespace IMDB.API.ApiService.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_TitleAkas", x => new { x.TitleId, x.Ordering, x.Title });
+                    table.PrimaryKey("PK_TitleAkas", x => new { x.TConst, x.Ordering, x.Title });
                 });
 
             migrationBuilder.CreateTable(
@@ -137,6 +169,12 @@ namespace IMDB.API.ApiService.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "Config");
+
+            migrationBuilder.DropTable(
+                name: "ExternalData");
+
             migrationBuilder.DropTable(
                 name: "NameBasics");
 

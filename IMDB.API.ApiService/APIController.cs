@@ -15,7 +15,7 @@ namespace IMDB.API.ApiService;
 public class APIController(AppDbContext db) : ControllerBase
 {
     private const int MAX_SEARCH_RESULTS = 1_000;
-    
+
     public const string PRIVILEGED_KEY_NAME = "PRIVILEGED_API_KEY";
     private readonly string _privilegedKey = Environment.GetEnvironmentVariable(PRIVILEGED_KEY_NAME) + string.Empty;
 
@@ -39,7 +39,7 @@ public class APIController(AppDbContext db) : ControllerBase
 
         var akas = await db.TitleAkas
                 .AsNoTracking()
-                .Where(_ => _.TitleId == ttId)
+                .Where(_ => _.TConst == ttId)
                 .OrderBy(_ => _.Ordering)
                 .ToListAsync();
         if (akas.Count == 0)
@@ -224,7 +224,7 @@ public class APIController(AppDbContext db) : ControllerBase
             .ThenBy(_ => _.TitleBasic.TConst)
             .FirstOrDefaultAsync();
 
-        if(queryResponse == null)
+        if (queryResponse == null)
             return NotFound();
 
         var ret = queryResponse.ExternalData ?? new ExternalData { TConst = queryResponse.TitleBasic.TConst };

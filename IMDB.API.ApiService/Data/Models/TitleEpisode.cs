@@ -1,8 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text;
 
 namespace IMDB.API.ApiService.Data.Models;
 
-public class TitleEpisode : IEquatable<TitleEpisode?>
+public class TitleEpisode : ICSV
 {
     [Key]
     public required string TConst { get; set; }
@@ -13,32 +14,17 @@ public class TitleEpisode : IEquatable<TitleEpisode?>
 
     public int? EpisodeNumber { get; set; }
 
-    public override bool Equals(object? obj)
+    public string ToCSV()
     {
-        return Equals(obj as TitleEpisode);
+        var sb = new StringBuilder();
+
+        sb.AppendCSVField(TConst, true);
+        sb.AppendCSVField(ParentTConst, true);
+        sb.AppendCSVField(SeasonNumber, true);
+        sb.AppendCSVField(EpisodeNumber, false);
+
+        return sb.ToString();
     }
 
-    public bool Equals(TitleEpisode? other)
-    {
-        return other is not null &&
-               TConst == other.TConst &&
-               ParentTConst == other.ParentTConst &&
-               SeasonNumber == other.SeasonNumber &&
-               EpisodeNumber == other.EpisodeNumber;
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(TConst, ParentTConst, SeasonNumber, EpisodeNumber);
-    }
-
-    public static bool operator ==(TitleEpisode? left, TitleEpisode? right)
-    {
-        return EqualityComparer<TitleEpisode>.Default.Equals(left, right);
-    }
-
-    public static bool operator !=(TitleEpisode? left, TitleEpisode? right)
-    {
-        return !(left == right);
-    }
+    public string ToHeaders() => $"{nameof(TConst)},{nameof(ParentTConst)},{nameof(SeasonNumber)},{nameof(EpisodeNumber)}";
 }

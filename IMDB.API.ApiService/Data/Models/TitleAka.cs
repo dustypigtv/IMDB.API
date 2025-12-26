@@ -1,11 +1,14 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
+using System.Text;
 
 namespace IMDB.API.ApiService.Data.Models;
 
-[PrimaryKey(nameof(TitleId), nameof(Ordering), nameof(Title))]
-public class TitleAka : IEquatable<TitleAka?>
+[PrimaryKey(nameof(TConst), nameof(Ordering), nameof(Title))]
+public class TitleAka : ICSV
 {
-    public required string TitleId { get; set; }
+    [Key]
+    public required string TConst { get; set; }
 
     public int Ordering { get; set; }
 
@@ -21,43 +24,21 @@ public class TitleAka : IEquatable<TitleAka?>
 
     public bool IsOriginalTitle { get; set; }
 
-
-
-
-
-    public string DictKey() => $"{TitleId}.{Ordering}.{Title}";
-
-
-    public override bool Equals(object? obj)
+    public string ToCSV()
     {
-        return Equals(obj as TitleAka);
+        var sb = new StringBuilder();
+
+        sb.AppendCSVField(TConst, true);
+        sb.AppendCSVField(Ordering, true);
+        sb.AppendCSVField(Title, true);
+        sb.AppendCSVField(Region, true);
+        sb.AppendCSVField(Language, true);
+        sb.AppendCSVField(Types, true);
+        sb.AppendCSVField(Attributes, true);
+        sb.AppendCSVField(IsOriginalTitle, false);
+
+        return sb.ToString();
     }
 
-    public bool Equals(TitleAka? other)
-    {
-        return other is not null &&
-               TitleId == other.TitleId &&
-               Ordering == other.Ordering &&
-               Title == other.Title &&
-               Region == other.Region &&
-               Language == other.Language &&
-               (Types ?? []).SequenceEqual(other.Types ?? []) &&
-               (Attributes ?? []).SequenceEqual(other.Attributes ?? []) &&
-               IsOriginalTitle == other.IsOriginalTitle;
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(TitleId, Ordering, Title, Region, Language, Types, Attributes, IsOriginalTitle);
-    }
-
-    public static bool operator ==(TitleAka? left, TitleAka? right)
-    {
-        return EqualityComparer<TitleAka>.Default.Equals(left, right);
-    }
-
-    public static bool operator !=(TitleAka? left, TitleAka? right)
-    {
-        return !(left == right);
-    }
+    public string ToHeaders() => $"{nameof(TConst)},{nameof(Ordering)},{nameof(Title)},{nameof(Region)},{nameof(Language)},{nameof(Types)},{nameof(Attributes)},{nameof(IsOriginalTitle)}";
 }

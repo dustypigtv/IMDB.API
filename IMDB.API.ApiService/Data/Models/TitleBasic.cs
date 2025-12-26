@@ -1,8 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text;
 
 namespace IMDB.API.ApiService.Data.Models;
 
-public class TitleBasic : IEquatable<TitleBasic?>
+public class TitleBasic : ICSV
 {
     [Key]
     public required string TConst { get; set; }
@@ -23,49 +24,23 @@ public class TitleBasic : IEquatable<TitleBasic?>
 
     public List<string>? Genres { get; set; }
 
-
-
-    public override bool Equals(object? obj)
+    public string ToCSV()
     {
-        return Equals(obj as TitleBasic);
+        var sb = new StringBuilder();
+
+        sb.AppendCSVField(TConst, true);
+        sb.AppendCSVField(TitleType, true);
+        sb.AppendCSVField(PrimaryTitle, true);
+        sb.AppendCSVField(OriginalTitle, true);
+        sb.AppendCSVField(IsAdult, true);
+        sb.AppendCSVField(StartYear, true);
+        sb.AppendCSVField(EndYear, true);
+        sb.AppendCSVField(RuntimeMinutes, true);
+        sb.AppendCSVField(Genres, false);
+
+        return sb.ToString();
     }
 
-    public bool Equals(TitleBasic? other)
-    {
-        return other is not null &&
-               TConst == other.TConst &&
-               TitleType == other.TitleType &&
-               PrimaryTitle == other.PrimaryTitle &&
-               OriginalTitle == other.OriginalTitle &&
-               IsAdult == other.IsAdult &&
-               StartYear == other.StartYear &&
-               EndYear == other.EndYear &&
-               RuntimeMinutes == other.RuntimeMinutes &&
-               (Genres ?? []).SequenceEqual(other.Genres ?? []);
-    }
+    public string ToHeaders() => $"{nameof(TConst)},{nameof(TitleType)},{nameof(PrimaryTitle)},{nameof(OriginalTitle)},{nameof(IsAdult)},{nameof(StartYear)},{nameof(EndYear)},{nameof(RuntimeMinutes)},{nameof(Genres)}";
 
-    public override int GetHashCode()
-    {
-        HashCode hash = new HashCode();
-        hash.Add(TConst);
-        hash.Add(TitleType);
-        hash.Add(PrimaryTitle);
-        hash.Add(OriginalTitle);
-        hash.Add(IsAdult);
-        hash.Add(StartYear);
-        hash.Add(EndYear);
-        hash.Add(RuntimeMinutes);
-        hash.Add(Genres);
-        return hash.ToHashCode();
-    }
-
-    public static bool operator ==(TitleBasic? left, TitleBasic? right)
-    {
-        return EqualityComparer<TitleBasic>.Default.Equals(left, right);
-    }
-
-    public static bool operator !=(TitleBasic? left, TitleBasic? right)
-    {
-        return !(left == right);
-    }
 }

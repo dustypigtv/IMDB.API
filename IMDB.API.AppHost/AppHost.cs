@@ -11,9 +11,12 @@ var seq = builder
     .WithDataVolume()
     .WithEnvironment("ACCEPT_EULA", "Y");
 
+var fileStore = builder.AddFileStore("tsvdata", "tsvdata");
+
+
 var postgresdb = builder
     .AddPostgres("postgres")
-    //.WithPgAdmin()
+    .WithFileStore(fileStore, "/tsvdata")
     .WithPgAdmin_MyVersion()
     .WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent)
@@ -24,6 +27,7 @@ var privilegedApiKey = builder.AddParameter("privileged-api-key");
 
 var apiService = builder
     .AddProject<Projects.IMDB_API_ApiService>("apiservice")
+    .WithFileStore(fileStore)
     .WithHttpHealthCheck("/health")
     .WithReference(postgresdb)
     .WaitFor(postgresdb)

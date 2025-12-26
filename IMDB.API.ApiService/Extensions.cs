@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 namespace IMDB.API.ApiService;
 
@@ -66,5 +67,66 @@ public static class Extensions
         if (uint.TryParse(s, out uint ret))
             return ret;
         return null;
+    }
+
+    
+
+    public static List<string> GetColumnNames<TEntity>(this DbContext context) where TEntity : class
+    {
+        var entityType = context.Model.FindEntityType(typeof(TEntity)) ?? throw new Exception("Entity type not found");
+        var storeObject = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
+        return [.. entityType.GetProperties().Select(property => property.GetColumnName(storeObject)!)];
+    }
+
+    public static Type GetColumnType<TEntity>(this DbContext context, string name) where TEntity : class
+    {
+        var entityType = context.Model.FindEntityType(typeof(TEntity)) ?? throw new Exception("Entity type not found");
+        var storeObject = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
+        var property = entityType.GetProperties().First(_ => _.GetColumnName(storeObject) == name);
+        return property.ClrType;
+    }
+
+    public static List<string> GetPrimaryKeyColumnNames<TEntity>(this DbContext context) where TEntity : class
+    {
+        var entityType = context.Model.FindEntityType(typeof(TEntity)) ?? throw new Exception("Entity type not found");
+        var primaryKey = entityType.FindPrimaryKey() ?? throw new Exception("Primary key not found");
+        var storeObject = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
+        return [.. primaryKey.Properties.Select(property => property.GetColumnName(storeObject)!)];
+    }
+
+    public static void AppendCSVField(this StringBuilder sb, object? value, bool addComma)
+    {
+
+        if (value != null)
+        {
+            var oType = value.GetType();
+            if (oType == typeof(string))
+            {
+                var str = (string)value;
+                if (str.HasValue())
+                {
+                    if (str.Contains(',') || str.Contains('"'))
+                        str = "\"" + str.Replace("\"", "\"\"") + "\"";
+                    sb.Append(str);
+                }
+            }
+            else if (value is List<string> lst)
+            {
+                if (lst.HasItems())
+                {
+                    string str = "{" + string.Join(',', lst) + "}";
+                    if (str.Contains(',') || str.Contains('"'))
+                        str = "\"" + str.Replace("\"", "\"\"") + "\"";
+                    sb.Append(str);
+                }
+            }
+            else
+            {
+                sb.Append(value);
+            }
+        }
+
+        if (addComma)
+            sb.Append(',');
     }
 }

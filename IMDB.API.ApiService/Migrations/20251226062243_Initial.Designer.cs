@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace IMDB.API.ApiService.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251224025647_ExternalData")]
-    partial class ExternalData
+    [Migration("20251226062243_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -57,7 +57,8 @@ namespace IMDB.API.ApiService.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("MPAA_Rating")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasJsonPropertyName("mpaaRating");
 
                     b.Property<string>("Plot")
                         .HasColumnType("text");
@@ -100,7 +101,7 @@ namespace IMDB.API.ApiService.Migrations
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleAka", b =>
                 {
-                    b.Property<string>("TitleId")
+                    b.Property<string>("TConst")
                         .HasColumnType("text");
 
                     b.Property<int>("Ordering")
@@ -124,7 +125,7 @@ namespace IMDB.API.ApiService.Migrations
                     b.PrimitiveCollection<List<string>>("Types")
                         .HasColumnType("text[]");
 
-                    b.HasKey("TitleId", "Ordering", "Title");
+                    b.HasKey("TConst", "Ordering", "Title");
 
                     b.ToTable("TitleAkas");
                 });
