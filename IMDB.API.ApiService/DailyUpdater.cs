@@ -397,25 +397,25 @@ public class DailyUpdater : IHostedService
         sb.AppendLine("BEGIN;");
         sb.AppendLine();
 
-        sb.AppendLine(@$"DROP TABLE IF EXISTS ""STAGING"";");
+        sb.AppendLine(@$"DROP TABLE IF EXISTS ""STAGING_{tn}"";");
         sb.AppendLine();
 
-        sb.AppendLine(@$"CREATE TEMP TABLE ""STAGING"" (LIKE ""{tn}"");");
+        sb.AppendLine(@$"CREATE TEMP TABLE ""STAGING_{tn}"" (LIKE ""{tn}"");");
         sb.AppendLine();
 
-        sb.AppendLine(@$"COPY ""STAGING"" FROM '{formattedFile.FullName}' DELIMITER ',' CSV HEADER;");
+        sb.AppendLine(@$"COPY ""STAGING_{tn}"" FROM '{formattedFile.FullName}' DELIMITER ',' CSV HEADER;");
         sb.AppendLine();
 
-        sb.AppendLine(@$"DELETE FROM ""{tn}"" WHERE ({pkNames}) NOT IN (SELECT {pkNames} FROM ""{tn}"");");
+        sb.AppendLine(@$"DELETE FROM ""{tn}"" WHERE ({pkNames}) NOT IN (SELECT {pkNames} FROM ""STAGING_{tn}"");");
         sb.AppendLine();
 
         sb.AppendLine(@$"INSERT INTO ""{tn}"" ({colNames})");
-        sb.AppendLine(@$"(SELECT {colNames} FROM ""STAGING"")");
+        sb.AppendLine(@$"(SELECT {colNames} FROM ""STAGING_{tn}"")");
         sb.AppendLine($@"ON CONFLICT ({pkNames}) DO UPDATE SET");
         sb.AppendLine(string.Join(", ", nkCols.Select(_ => $@"""{_}"" = EXCLUDED.""{_}""")) + ";");
         sb.AppendLine();
 
-        sb.AppendLine(@$"DROP TABLE IF EXISTS ""STAGING"";");
+        sb.AppendLine(@$"DROP TABLE IF EXISTS ""STAGING_{tn}"";");
         sb.AppendLine();
 
         sb.AppendLine("COMMIT;");
