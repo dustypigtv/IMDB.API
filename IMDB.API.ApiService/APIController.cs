@@ -19,19 +19,19 @@ public class APIController(AppDbContext db) : ControllerBase
     public const string PRIVILEGED_KEY_NAME = "PRIVILEGED_API_KEY";
     private readonly string _privilegedKey = Environment.GetEnvironmentVariable(PRIVILEGED_KEY_NAME) + string.Empty;
 
-    [HttpGet("{ttId}")]
+    [HttpGet("{tConst}")]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(Title))]
-    public async Task<ActionResult<Title>> GetTitle(string ttId)
+    public async Task<ActionResult<Title>> GetTitle(string tConst)
     {
-        if (!ttId.HasValue())
+        if (!tConst.HasValue())
             return NotFound();
 
-        ttId = ttId.ToLower();
+        tConst = tConst.ToLower();
 
 
         var titleBasic = await db.TitleBasics
             .AsNoTracking()
-            .Where(_ => _.TConst == ttId)
+            .Where(_ => _.TConst == tConst)
             .FirstOrDefaultAsync();
 
         if (titleBasic is null)
@@ -39,7 +39,7 @@ public class APIController(AppDbContext db) : ControllerBase
 
         var akas = await db.TitleAkas
                 .AsNoTracking()
-                .Where(_ => _.TConst == ttId)
+                .Where(_ => _.TConst == tConst)
                 .OrderBy(_ => _.Ordering)
                 .ToListAsync();
         if (akas.Count == 0)
@@ -47,24 +47,24 @@ public class APIController(AppDbContext db) : ControllerBase
 
         var titleCrew = await db.TitleCrews
             .AsNoTracking()
-            .Where(_ => _.TConst == ttId)
+            .Where(_ => _.TConst == tConst)
             .FirstOrDefaultAsync();
 
         var titleRating = await db.TitleRatings
             .AsNoTracking()
-            .Where(_ => _.TConst == ttId)
+            .Where(_ => _.TConst == tConst)
             .FirstOrDefaultAsync();
 
         var principals = await db.TitlePrincipals
             .AsNoTracking()
-            .Where(_ => _.TConst == ttId)
+            .Where(_ => _.TConst == tConst)
             .ToListAsync();
         if (principals.Count == 0)
             principals = null;
 
         var episodes = await db.TitleEpisodes
             .AsNoTracking()
-            .Where(_ => _.ParentTConst == ttId)
+            .Where(_ => _.ParentTConst == tConst)
             .ToListAsync();
         if (episodes.Count == 0)
             episodes = null;
@@ -72,7 +72,7 @@ public class APIController(AppDbContext db) : ControllerBase
 
         var externalData = await db.ExternalData
             .AsNoTracking()
-            .Where(_ => _.TConst == ttId)
+            .Where(_ => _.TConst == tConst)
             .FirstOrDefaultAsync();
 
         var ret = new Title
@@ -90,18 +90,18 @@ public class APIController(AppDbContext db) : ControllerBase
     }
 
 
-    [HttpGet("{nmId}")]
+    [HttpGet("{nConst}")]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(NameBasic))]
-    public async Task<ActionResult<NameBasic>> GetPerson(string nmId)
+    public async Task<ActionResult<NameBasic>> GetPerson(string nConst)
     {
-        if (!nmId.HasValue())
+        if (!nConst.HasValue())
             return NotFound();
 
-        nmId = nmId.ToLower();
+        nConst = nConst.ToLower();
 
         var ret = await db.NameBasics
             .AsNoTracking()
-            .Where(_ => _.NConst == nmId)
+            .Where(_ => _.NConst == nConst)
             .FirstOrDefaultAsync();
 
         if (ret == null)
