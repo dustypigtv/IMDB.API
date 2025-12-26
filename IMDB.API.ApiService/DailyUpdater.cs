@@ -2,7 +2,9 @@
 using IMDB.API.ApiService.Data;
 using IMDB.API.ApiService.Data.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.IO.Compression;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace IMDB.API.ApiService;
@@ -16,7 +18,7 @@ public class DailyUpdater : IHostedService
     */
 
     private const int ONE_SECOND = 1_000;
-    private const int ONE_DAY = ONE_SECOND * 60 * 60 * 24;
+    private const int ONE_MINUTE = ONE_SECOND * 60;
 
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly CancellationTokenSource _cts = new();
@@ -33,37 +35,10 @@ public class DailyUpdater : IHostedService
         _timer = new(Tick);
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            //Try to set the timer to the next time if possible
-            using var scope = _serviceScopeFactory.CreateScope();
-            using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            
-            var config = await db.Config
-                .AsNoTracking()
-                .Where(_ => _.Id == 1)
-                .FirstAsync(_cancellationToken);
-
-
-            var nextUpdate = config.LastUpdate.AddDays(1);
-            if (nextUpdate > DateTime.UtcNow.AddMinutes(1))
-            {
-                //Wait 24 hours from previous update
-                _timer.Change(nextUpdate - DateTime.UtcNow, Timeout.InfiniteTimeSpan);
-            }
-            else
-            {
-                //It's been more than 24 hours since last update, so start now
-                _timer.Change(ONE_SECOND, Timeout.Infinite);
-            }
-        }
-        catch
-        {
-            //Something went wrong (like the config row doesn't exist), so just start now
-            _timer.Change(ONE_SECOND, Timeout.Infinite);
-        }
+        _timer.Change(ONE_SECOND, Timeout.Infinite);
+        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
@@ -79,7 +54,16 @@ public class DailyUpdater : IHostedService
             try
             {
                 _logger.LogDebug("Tick");
-                await DoWork();
+                
+                using var scope = _serviceScopeFactory.CreateScope();
+                using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var config = await db.Config
+                    .AsNoTracking()
+                    .Where(_ => _.Id == 1)
+                    .FirstOrDefaultAsync(_cancellationToken) ?? new();
+
+                if(DateTime.UtcNow > config.LastUpdate.AddDays(1))
+                    await DoWork();
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -109,7 +93,7 @@ public class DailyUpdater : IHostedService
 
 
         if (!_cancellationToken.IsCancellationRequested)
-            try { _timer.Change(ONE_DAY, Timeout.Infinite); }
+            try { _timer.Change(ONE_MINUTE, Timeout.Infinite); }
             catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
@@ -122,73 +106,87 @@ public class DailyUpdater : IHostedService
     {
         try
         {
+            await StartUpdate<TitleBasic>();
             await UpdateTitleBasics();
+            await UpdateSuccess<TitleBasic>();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, nameof(UpdateTitleBasics) + " Failed");
+            await UpdateError<TitleBasic>(ex);
         }
 
 
         try
         {
+            await StartUpdate<TitleAka>();
             await UpdateTitleAkas();
+            await UpdateSuccess<TitleAka>();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, nameof(UpdateTitleAkas) + " Failed");
+            await UpdateError<TitleAka>(ex);
         }
 
         try
         {
+            await StartUpdate<TitleCrew>();
             await UpdateTitleCrew();
+            await UpdateSuccess<TitleCrew>();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, nameof(UpdateTitleCrew) + " Failed");
+            await UpdateError<TitleCrew>(ex);
         }
 
         try
         {
+            await StartUpdate<TitleEpisode>();
             await UpdateTitleEpisodes();
+            await UpdateSuccess<TitleEpisode>();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, nameof(UpdateTitleEpisodes) + " Failed");
+            await UpdateError<TitleEpisode>(ex);
         }
 
         try
         {
+            await StartUpdate<TitlePrincipal>();
             await UpdateTitlePrincipals();
+            await UpdateSuccess<TitlePrincipal>();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, nameof(UpdateTitlePrincipals) + " Failed");
+            await UpdateError<TitlePrincipal>(ex);
         }
 
         try
         {
+            await StartUpdate<TitleRating>();
             await UpdateTitleRatings();
+            await UpdateSuccess<TitleRating>();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, nameof(UpdateTitleRatings) + " Failed");
+            await UpdateError<TitleRating>(ex);
         }
 
         try
         {
+            await StartUpdate<NameBasic>();
             await UpdateNameBasics();
+            await UpdateSuccess<NameBasic>();
         }
-        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, nameof(UpdateNameBasics) + " Failed");
+            await UpdateError<NameBasic>(ex);
         }
     }
 
@@ -334,6 +332,86 @@ public class DailyUpdater : IHostedService
 
 
 
+
+    private async Task StartUpdate<T>() where T : class
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var tn = db.GetTableName<T>();
+            var history = await db.UpdateHistories
+                .Where(_ => _.TableName == tn)
+                .FirstOrDefaultAsync(_cancellationToken) ??
+                db.UpdateHistories.Add(new UpdateHistory { TableName = tn }).Entity;
+
+            history.LastStarted = DateTime.UtcNow;
+            history.LastFinished = null;
+            history.Success = null;
+            history.LastError = null;
+
+            await db.SaveChangesAsync(_cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, nameof(StartUpdate) + ": " + typeof(T).Name);
+        }
+    }
+
+    private async Task UpdateSuccess<T>() where T : class
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var tn = db.GetTableName<T>();
+            var history = await db.UpdateHistories
+                .Where(_ => _.TableName == tn)
+                .FirstOrDefaultAsync(_cancellationToken) ??
+                db.UpdateHistories.Add(new UpdateHistory { TableName = tn }).Entity;
+
+            history.LastStarted ??= DateTime.UtcNow;
+            history.LastFinished = DateTime.UtcNow;
+            history.Success = true;
+            history.LastError = null;
+
+            await db.SaveChangesAsync(_cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, nameof(UpdateSuccess) + ": " + typeof(T).Name);
+        }
+    }
+
+
+
+    private async Task UpdateError<T>(Exception err) where T : class
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var tn = db.GetTableName<T>();
+            var history = await db.UpdateHistories
+                .Where(_ => _.TableName == tn)
+                .FirstOrDefaultAsync(_cancellationToken) ??
+                db.UpdateHistories.Add(new UpdateHistory { TableName = tn }).Entity;
+
+            history.LastStarted ??= DateTime.UtcNow;
+            history.LastFinished = DateTime.UtcNow;
+            history.Success = false;
+            history.LastError = err.ToString();
+
+            await db.SaveChangesAsync(_cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, nameof(UpdateError) + ": " + typeof(T).Name);
+        }
+    }
 
 
 
