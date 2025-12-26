@@ -23,7 +23,7 @@ var postgresdb = builder
 
 var privilegedApiKey = builder.AddParameter("privileged-api-key");
 
-var apiService = builder
+builder
     .AddProject<Projects.IMDB_API_ApiService>("apiservice")
     .WithHttpHealthCheck("/health")
     .WithReference(postgresdb)

@@ -50,55 +50,72 @@ public class DailyUpdater : IHostedService
 
     private async void Tick(object? state)
     {
-        if (!_cancellationToken.IsCancellationRequested)
+        _logger.LogDebug("Tick");
+
+        bool shouldDoWork = false;
+
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var config = await db.Config
+                .AsNoTracking()
+                .Where(_ => _.Id == 1)
+                .FirstOrDefaultAsync(_cancellationToken) ?? new();
+
+            if (DateTime.UtcNow > config.LastUpdate.AddDays(1))
+                shouldDoWork = true;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Tick");
+        }
+
+
+        if (shouldDoWork)
+        {
+            bool success = false;
             try
             {
-                _logger.LogDebug("Tick");
-                
-                using var scope = _serviceScopeFactory.CreateScope();
-                using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var config = await db.Config
-                    .AsNoTracking()
-                    .Where(_ => _.Id == 1)
-                    .FirstOrDefaultAsync(_cancellationToken) ?? new();
-
-                if(DateTime.UtcNow > config.LastUpdate.AddDays(1))
-                    await DoWork();
+                await DoWork();
+                success = true;
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Tick");
+                _logger.LogError(ex, "DoWork failed");
             }
 
-
-        if (!_cancellationToken.IsCancellationRequested)
-            try
+            if (success)
             {
-                using var scope = _serviceScopeFactory.CreateScope();
-                using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var config = await db.Config
-                    .Where(_ => _.Id == 1)
-                    .FirstOrDefaultAsync(_cancellationToken);
-                config ??= db.Config.Add(new Config { Id = 1 }).Entity;
-                config.LastUpdate = DateTime.UtcNow;
-                await db.SaveChangesAsync(_cancellationToken);
+                try
+                {
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var config = await db.Config
+                        .Where(_ => _.Id == 1)
+                        .FirstOrDefaultAsync(_cancellationToken);
+                    config ??= db.Config.Add(new Config { Id = 1 }).Entity;
+                    config.LastUpdate = DateTime.UtcNow;
+                    await db.SaveChangesAsync(_cancellationToken);
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed updating LastUpdate in database");
+                }
             }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed updating LastUpdate in database");
-            }
+        }
 
-
-
-        if (!_cancellationToken.IsCancellationRequested)
-            try { _timer.Change(ONE_MINUTE, Timeout.Infinite); }
-            catch (ObjectDisposedException) { }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed restarting timer");
-            }
+       
+        //Reset timer to tick again in 1 minute
+        try { _timer.Change(ONE_MINUTE, Timeout.Infinite); }
+        catch (ObjectDisposedException) { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed restarting timer");
+        }
     }
 
 
