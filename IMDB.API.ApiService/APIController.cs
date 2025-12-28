@@ -2,8 +2,8 @@
 using IMDB.API.ApiService.Data.Models;
 using IMDB.API.ApiService.Responses;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace IMDB.API.ApiService;
@@ -14,6 +14,8 @@ namespace IMDB.API.ApiService;
 [SwaggerResponse(StatusCodes.Status500InternalServerError, Type = typeof(ProblemDetails))]
 public class APIController(AppDbContext db) : ControllerBase
 {
+    private const int ONE_DAY = 86400;
+
     private const int MAX_SEARCH_RESULTS = 1_000;
 
     public const string PRIVILEGED_KEY_NAME = "PRIVILEGED_API_KEY";
@@ -24,6 +26,7 @@ public class APIController(AppDbContext db) : ControllerBase
     private readonly string _privilegedKey = Environment.GetEnvironmentVariable(PRIVILEGED_KEY_NAME) + string.Empty;
 
     [HttpGet("{tConst}")]
+    [OutputCache(Duration = ONE_DAY)]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(Title))]
     public async Task<ActionResult<Title>> GetTitle(string tConst)
     {
@@ -31,70 +34,88 @@ public class APIController(AppDbContext db) : ControllerBase
             return NotFound();
 
         tConst = tConst.ToLower();
+        var tConstId = tConst.ToNumId();
+
+        var q = from titleBasic in db.TitleBasics.Where(_ => _.TConstId == tConstId)
+
+                join titleCrew in db.TitleCrews on titleBasic.TConstId equals titleCrew.TConstId into titleCrewLJ
+                from titleCrew in titleCrewLJ.DefaultIfEmpty()
+
+                join titleRating in db.TitleRatings on titleBasic.TConstId equals titleRating.TConstId into titleRatingLJ
+                from titleRating in titleRatingLJ.DefaultIfEmpty()
+
+                join externalData in db.ExternalData on titleBasic.TConstId equals externalData.TConstId into externalDataLJ
+                from externalData in externalDataLJ.DefaultIfEmpty()
+
+                select new Title
+                {
+                    Basic = titleBasic,
+                    Crew = titleCrew,
+                    Rating = titleRating,
+                    ExternalData = externalData
+                };
 
 
-        var titleBasic = await db.TitleBasics
-            .AsNoTracking()
-            .Where(_ => _.TConst == tConst)
-            .FirstOrDefaultAsync();
-
-        if (titleBasic is null)
+        var ret = await q.AsNoTracking().FirstOrDefaultAsync();
+        if (ret == null || ret.Basic == null)
             return NotFound();
 
-        var akas = await db.TitleAkas
-                .AsNoTracking()
-                .Where(_ => _.TConst == tConst)
-                .OrderBy(_ => _.Ordering)
-                .ToListAsync();
-        if (akas.Count == 0)
-            akas = null;
+        ret.Basic.TConst = tConst;
+        ret.Crew?.TConst = tConst;
+        ret.Rating?.TConst = tConst;
+        ret.ExternalData?.TConst = tConst;
 
-        var titleCrew = await db.TitleCrews
+        ret.Akas = await db.TitleAkas
             .AsNoTracking()
-            .Where(_ => _.TConst == tConst)
-            .FirstOrDefaultAsync();
-
-        var titleRating = await db.TitleRatings
-            .AsNoTracking()
-            .Where(_ => _.TConst == tConst)
-            .FirstOrDefaultAsync();
-
-        var principals = await db.TitlePrincipals
-            .AsNoTracking()
-            .Where(_ => _.TConst == tConst)
+            .Where(_ => _.TConstId == tConstId)
             .ToListAsync();
-        if (principals.Count == 0)
-            principals = null;
+        if (ret.Akas?.Count > 0)
+            ret.Akas.ForEach(_ => _.TConst = tConst);
+        else
+            ret.Akas = null;
 
-        var episodes = await db.TitleEpisodes
+
+        ret.Episodes = await db.TitleEpisodes
             .AsNoTracking()
-            .Where(_ => _.ParentTConst == tConst)
+            .Where(_ => _.ParentTConstId == tConstId)
             .ToListAsync();
-        if (episodes.Count == 0)
-            episodes = null;
-
-
-        var externalData = await db.ExternalData
-            .AsNoTracking()
-            .Where(_ => _.TConst == tConst)
-            .FirstOrDefaultAsync();
-
-        var ret = new Title
+        if (ret.Episodes?.Count > 0)
         {
-            Akas = akas,
-            Basic = titleBasic,
-            Crew = titleCrew,
-            Episodes = episodes,
-            Principals = principals,
-            Rating = titleRating,
-            ExternalData = externalData
-        };
+            ret.Episodes.ForEach(_ =>
+            {
+                _.TConst = _.TConstId.ToTConst();
+                _.ParentTConst = tConst;
+            });
+        }
+        else
+        {
+            ret.Episodes = null;
+        }
+
+
+        ret.Principals = await db.TitlePrincipals
+            .AsNoTracking()
+            .Where(_ => _.TConstId == tConstId)
+            .ToListAsync();
+        if (ret.Principals?.Count > 0)
+        {
+            ret.Principals.ForEach(_ =>
+            {
+                _.TConst = tConst;
+                _.NConst = _.NConstId.ToNConst();
+            });
+        }
+        else
+        {
+            ret.Principals = null;
+        }
 
         return Ok(ret);
     }
 
 
     [HttpGet("{nConst}")]
+    [OutputCache(Duration = ONE_DAY)]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(NameBasic))]
     public async Task<ActionResult<NameBasic>> GetPerson(string nConst)
     {
@@ -102,25 +123,30 @@ public class APIController(AppDbContext db) : ControllerBase
             return NotFound();
 
         nConst = nConst.ToLower();
+        var nConstId = nConst.ToNumId();
 
         var ret = await db.NameBasics
             .AsNoTracking()
-            .Where(_ => _.NConst == nConst)
+            .Where(_ => _.NConstId == nConstId)
             .FirstOrDefaultAsync();
 
         if (ret == null)
             return NotFound();
+
+        ret.NConst = nConst;
 
         return Ok(ret);
     }
 
 
     [HttpGet]
+    [OutputCache(Duration = ONE_DAY)]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(IEnumerable<TitleSearchResult>))]
     public async Task<ActionResult<IEnumerable<TitleSearchResult>>> SearchTitle(string query, string? titleType, int? year, bool? adult)
     {
         if (!query.HasValue())
             return NotFound();
+        query = query.Trim();
 
         var q1 = db.TitleBasics.AsNoTracking();
 
@@ -141,7 +167,7 @@ public class APIController(AppDbContext db) : ControllerBase
             });
 
         var q3 = from item in q2
-                 join rating in db.TitleRatings on item.Val.TConst equals rating.TConst into lj
+                 join rating in db.TitleRatings on item.Val.TConstId equals rating.TConstId into lj
                  from rating in lj.DefaultIfEmpty()
                  select new TitleSearchResult
                  {
@@ -151,7 +177,9 @@ public class APIController(AppDbContext db) : ControllerBase
                  };
 
         var ret = await q3
-            .OrderByDescending(_ => _.Rank)
+            .OrderBy(_ => _.Basic.PrimaryTitle.ToLower() == query.ToLower() ? 0 : 1)
+            .ThenBy(_ => _.Basic.OriginalTitle.ToLower() == query.ToLower() ? 0 : 1)
+            .ThenByDescending(_ => _.Rank)
             .ThenByDescending(_ => _.Rating == null ? 0 : _.Rating.AverageWeighting)
             .ThenByDescending(_ => _.Rating == null ? 0 : _.Rating.NumVotes)
             .ThenByDescending(_ => _.Basic.PrimaryTitle)
@@ -160,16 +188,24 @@ public class APIController(AppDbContext db) : ControllerBase
         if (ret.Count == 0)
             return NotFound();
 
+        ret.ForEach(_ =>
+        {
+            _.Basic.TConst = _.Basic.TConstId.ToTConst();
+            _.Rating?.TConst = _.Rating.TConstId.ToTConst();
+        });
+
         return Ok(ret);
     }
 
 
     [HttpGet]
+    [OutputCache(Duration = ONE_DAY)]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(IEnumerable<NameBasic>))]
     public async Task<ActionResult<IEnumerable<NameBasic>>> SearchPerson(string query, string? primaryProfession)
     {
         if (!query.HasValue())
             return NotFound();
+        query = query.Trim();
 
         var q1 = db.NameBasics.AsNoTracking();
 
@@ -182,7 +218,8 @@ public class APIController(AppDbContext db) : ControllerBase
                 Val = _,
                 Rank = EF.Functions.ToTsVector("english", _.PrimaryName).RankCoverDensity(EF.Functions.PhraseToTsQuery(query))
             })
-            .OrderByDescending(_ => _.Rank)
+            .OrderBy(_ => _.Val.PrimaryName.ToLower() == query.ToLower() ? 0 : 1)
+            .ThenByDescending(_ => _.Rank)
             .Take(MAX_SEARCH_RESULTS);
 
 
@@ -191,11 +228,13 @@ public class APIController(AppDbContext db) : ControllerBase
         if (ret.Count == 0)
             return NotFound();
 
+        ret.ForEach(_ => _.Val.NConst = _.Val.NConstId.ToNConst());
+
         return Ok(ret.Select(_ => _.Val));
     }
 
 
-    
+
     /// <summary>
     /// This endpoint isn't for public use
     /// </summary>
@@ -210,9 +249,9 @@ public class APIController(AppDbContext db) : ControllerBase
             return new StatusCodeResult(StatusCodes.Status401Unauthorized);
 
         var q = from tb in db.TitleBasics.Where(_ => ExternalDataFilter.Contains(_.TitleType))
-                join tr in db.TitleRatings on tb.TConst equals tr.TConst into lj1
+                join tr in db.TitleRatings on tb.TConstId equals tr.TConstId into lj1
                 from tr in lj1.DefaultIfEmpty()
-                join ed in db.ExternalData on tb.TConst equals ed.TConst into lj2
+                join ed in db.ExternalData on tb.TConstId equals ed.TConstId into lj2
                 from ed in lj2.DefaultIfEmpty()
                 select new
                 {
@@ -225,13 +264,15 @@ public class APIController(AppDbContext db) : ControllerBase
         var queryResponse = await q
             .OrderBy(_ => _.LastUpdated)
             .ThenByDescending(_ => _.NumVotes)
-            .ThenBy(_ => _.TitleBasic.TConst)
+            .ThenBy(_ => _.TitleBasic.TConstId)
             .FirstOrDefaultAsync();
 
         if (queryResponse == null)
             return NotFound();
 
-        var ret = queryResponse.ExternalData ?? new ExternalData { TConst = queryResponse.TitleBasic.TConst };
+        var ret = queryResponse.ExternalData ?? new ExternalData { TConstId = queryResponse.TitleBasic.TConstId };
+        ret.TConst = ret.TConstId.ToTConst();
+
         return Ok(ret);
     }
 
@@ -251,10 +292,11 @@ public class APIController(AppDbContext db) : ControllerBase
 
 
         if (!externalData.TConst.HasValue())
-            throw new ArgumentNullException(nameof(externalData.TConst));
+            return BadRequest();
 
+        externalData.TConstId = externalData.TConst.ToNumId();
         var entity = await db.ExternalData
-            .Where(_ => _.TConst == externalData.TConst)
+            .Where(_ => _.TConstId == externalData.TConstId)
             .FirstOrDefaultAsync();
 
         if (entity == null)
@@ -274,6 +316,4 @@ public class APIController(AppDbContext db) : ControllerBase
 
         return Ok();
     }
-
-
 }

@@ -1,30 +1,25 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Text;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace IMDB.API.ApiService.Data.Models;
 
-public class TitleEpisode : ICSV
+public class TitleEpisode
 {
+    [JsonIgnore]
     [Key]
-    public required string TConst { get; set; }
+    public ulong TConstId { get; set; }
 
-    public required string ParentTConst { get; set; }
+    [NotMapped]
+    public string TConst { get; set; } = string.Empty;
 
-    public int? SeasonNumber { get; set; }
+    [JsonIgnore]
+    public ulong ParentTConstId { get; set; }
 
-    public int? EpisodeNumber { get; set; }
+    [NotMapped]
+    public string ParentTConst { get; set; } = string.Empty;
 
-    public string ToCSV()
-    {
-        var sb = new StringBuilder();
+    public ushort? SeasonNumber { get; set; }
 
-        sb.AppendCSVField(TConst, true);
-        sb.AppendCSVField(ParentTConst, true);
-        sb.AppendCSVField(SeasonNumber, true);
-        sb.AppendCSVField(EpisodeNumber, false);
-
-        return sb.ToString();
-    }
-
-    public string ToHeaders() => $"{nameof(TConst)},{nameof(ParentTConst)},{nameof(SeasonNumber)},{nameof(EpisodeNumber)}";
+    public ushort? EpisodeNumber { get; set; }
 }

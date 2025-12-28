@@ -28,6 +28,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        //foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        //{
+        //    entityType.SetTableName(entityType.ClrType.Name.ToLowerInvariant());
+        //    foreach (var property in entityType.GetProperties())
+        //        property.SetColumnName(property.GetColumnName().ToLowerInvariant());
+        //}
 
         //Someday I'll figure out how to not make SearchVector either nullable or required while allowing null since it's computed
         //Until then... disable nullable for this
@@ -44,5 +50,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .IsTsVectorExpressionIndex("english");
 
 #nullable enable
+
+
+        
+
+
     }
 }

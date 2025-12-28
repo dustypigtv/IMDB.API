@@ -1,12 +1,17 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Text;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace IMDB.API.ApiService.Data.Models;
 
-public class TitleBasic : ICSV
+public class TitleBasic
 {
+    [JsonIgnore]
     [Key]
-    public required string TConst { get; set; }
+    public ulong TConstId { get; set; }
+
+    [NotMapped]
+    public string TConst { get; set; } = string.Empty;
 
     public required string TitleType { get; set; }
 
@@ -20,27 +25,7 @@ public class TitleBasic : ICSV
 
     public ushort? EndYear { get; set; }
 
-    public uint? RuntimeMinutes { get; set; }
+    public ushort? RuntimeMinutes { get; set; }
 
     public List<string>? Genres { get; set; }
-
-    public string ToCSV()
-    {
-        var sb = new StringBuilder();
-
-        sb.AppendCSVField(TConst, true);
-        sb.AppendCSVField(TitleType, true);
-        sb.AppendCSVField(PrimaryTitle, true);
-        sb.AppendCSVField(OriginalTitle, true);
-        sb.AppendCSVField(IsAdult, true);
-        sb.AppendCSVField(StartYear, true);
-        sb.AppendCSVField(EndYear, true);
-        sb.AppendCSVField(RuntimeMinutes, true);
-        sb.AppendCSVField(Genres, false);
-
-        return sb.ToString();
-    }
-
-    public string ToHeaders() => $"{nameof(TConst)},{nameof(TitleType)},{nameof(PrimaryTitle)},{nameof(OriginalTitle)},{nameof(IsAdult)},{nameof(StartYear)},{nameof(EndYear)},{nameof(RuntimeMinutes)},{nameof(Genres)}";
-
 }

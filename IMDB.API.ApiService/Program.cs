@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
+builder.AddRedisOutputCache("cache");
 builder.AddSeqEndpoint("seq");
 builder.AddNpgsqlDbContext<AppDbContext>("imdb-dumps", settings => { }, options =>
 {
@@ -37,21 +38,6 @@ using (var scope = app.Services.CreateScope())
 {
     using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
-
-    //Make sure config exists
-    var config = await db.Config
-        .Where(_ => _.Id == 1)
-        .FirstOrDefaultAsync();
-    if (config == null)
-    {
-        config = new()
-        {
-            Id = 1,
-            LastUpdate = DateTime.MinValue
-        };
-        db.Config.Add(config);
-        await db.SaveChangesAsync();
-    }
 }
 
 
@@ -68,7 +54,7 @@ app.UseSwaggerUI(options =>
 
 
 
-
+app.UseOutputCache();
 
 app.MapDefaultEndpoints();
 app.MapControllers();

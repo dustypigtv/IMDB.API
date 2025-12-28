@@ -1,10 +1,9 @@
 ﻿using DustyPig.Utils;
+using EFCore.BulkExtensions;
 using IMDB.API.ApiService.Data;
 using IMDB.API.ApiService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using System.IO.Compression;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace IMDB.API.ApiService;
@@ -19,7 +18,9 @@ public class DailyUpdater : IHostedService
 
     private const int ONE_SECOND = 1_000;
     private const int ONE_MINUTE = ONE_SECOND * 60;
+    private const int DEFAULT_CHUNK_SIZE = 100_000;
 
+    private readonly int _chunkSize;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly CancellationTokenSource _cts = new();
     private readonly CancellationToken _cancellationToken;
@@ -30,6 +31,12 @@ public class DailyUpdater : IHostedService
     public DailyUpdater(IServiceScopeFactory serviceScopeFactory, ILogger<DailyUpdater> logger)
     {
         _cancellationToken = _cts.Token;
+
+        try { _chunkSize = int.Parse(Environment.GetEnvironmentVariable("DB_CHUNK_SIZE")!); }
+        catch { }
+        if (_chunkSize <= 0)
+            _chunkSize = DEFAULT_CHUNK_SIZE;
+
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _timer = new(Tick);
@@ -73,6 +80,10 @@ public class DailyUpdater : IHostedService
         }
 
 
+#if DEBUG
+        shouldDoWork = true;
+#endif
+
         if (shouldDoWork)
         {
             bool success = false;
@@ -96,6 +107,7 @@ public class DailyUpdater : IHostedService
                     var config = await db.Config
                         .Where(_ => _.Id == 1)
                         .FirstOrDefaultAsync(_cancellationToken);
+
                     config ??= db.Config.Add(new Config { Id = 1 }).Entity;
                     config.LastUpdate = DateTime.UtcNow;
                     await db.SaveChangesAsync(_cancellationToken);
@@ -218,14 +230,14 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleBasic
         {
-            TConst = fields[0],
+            TConstId = fields[0].ToNumId(),
             TitleType = fields[1],
             PrimaryTitle = fields[2],
             OriginalTitle = fields[3],
             IsAdult = fields[4] != "0",
             StartYear = fields[5].TryGetUShort(),
             EndYear = fields[6].TryGetUShort(),
-            RuntimeMinutes = fields[7].TryGetUInt(),
+            RuntimeMinutes = fields[7].TryGetUShort(),
             Genres = fields[8].ToStringList()
         });
     }
@@ -240,8 +252,9 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleAka
         {
-            TConst = fields[0],
-            Ordering = int.Parse(fields[1]),
+            TConstId = fields[0].ToNumId(),
+            Ordering = ushort.Parse(fields[1]),
+            TitleHashId = fields[2].Hash(),
             Title = fields[2],
             Region = fields[3] == "\\N" ? null : fields[3],
             Language = fields[4] == "\\N" ? null : fields[4],
@@ -263,7 +276,7 @@ public class DailyUpdater : IHostedService
         {
             var ret = new TitleCrew
             {
-                TConst = fields[0],
+                TConstId = fields[0].ToNumId(),
                 Directors = fields[1].ToStringList(),
                 Writers = fields[2].ToStringList(),
             };
@@ -283,10 +296,10 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleEpisode
         {
-            TConst = fields[0],
-            ParentTConst = fields[1],
-            SeasonNumber = fields[2].TryGetInt(),
-            EpisodeNumber = fields[3].TryGetInt()
+            TConstId = fields[0].ToNumId(),
+            ParentTConstId = fields[1].ToNumId(),
+            SeasonNumber = fields[2].TryGetUShort(),
+            EpisodeNumber = fields[3].TryGetUShort()
         });
     }
 
@@ -300,9 +313,9 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitlePrincipal
         {
-            TConst = fields[0],
-            Ordering = int.Parse(fields[1]),
-            NConst = fields[2],
+            TConstId = fields[0].ToNumId(),
+            Ordering = ushort.Parse(fields[1]),
+            NConstId = fields[2].ToNumId(),
             Category = fields[3],
             Job = fields[4] == "\\N" ? null : fields[4],
             Character = fields[5] == "\\N" ? null : fields[5]
@@ -319,9 +332,9 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleRating
         {
-            TConst = fields[0],
+            TConstId = fields[0].ToNumId(),
             AverageWeighting = float.Parse(fields[1]),
-            NumVotes = int.Parse(fields[2])
+            NumVotes = uint.Parse(fields[2])
         });
     }
 
@@ -335,10 +348,10 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new NameBasic
         {
-            NConst = fields[0],
+            NConstId = fields[0].ToNumId(),
             PrimaryName = fields[1],
-            BirthYear = fields[2].TryGetInt(),
-            DeathYear = fields[3].TryGetInt(),
+            BirthYear = fields[2].TryGetUShort(),
+            DeathYear = fields[3].TryGetUShort(),
             PrimaryProfessions = fields[4].ToStringList(),
             KnownForTitles = fields[5].ToStringList(),
         });
@@ -375,6 +388,8 @@ public class DailyUpdater : IHostedService
             _logger.LogError(ex, nameof(StartUpdate) + ": " + typeof(T).Name);
         }
     }
+
+
 
     private async Task UpdateSuccess<T>() where T : class
     {
@@ -432,90 +447,111 @@ public class DailyUpdater : IHostedService
 
 
 
-    private async Task ImportFile<T>(string url, Func<string[], T?> createEntity) where T : class, ICSV
+    private async Task ImportFile<T>(string url, Func<string[], T?> createEntity) where T : class
     {
+        /*
+            Quick note: The BulkInsert extension doesn't work with uint, so made id's ulong 
+        */
+
+        //Download
         var tmpFile = new FileInfo(Path.Combine("/tmp", Path.ChangeExtension(Path.GetFileName(url), null)));
         await DownloadFile(url, tmpFile);
 
-        var formattedFile = new FileInfo(Path.Combine("/tsvdata",  tmpFile.Name));
-        formattedFile.TryDelete();
+        //Get the db context
+        using var scope = _serviceScopeFactory.CreateScope();
+        using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        //These are LONG running queries. Hence the scoped context
+        db.Database.SetCommandTimeout(TimeSpan.FromDays(1));
+
+        //Get info
+        var tableName = db.GetTableName<T>();
+        
+        string sql = $"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' ORDER BY ORDINAL_POSITION";
+        var cols = db.Database.SqlQueryRaw<string>(sql).ToList();
+
+        var pkCols = db.GetPrimaryKeyColumnNames<T>();
+        var nkCols = cols.ToList();
+        nkCols.RemoveAll(_ => pkCols.Contains(_));
+        string pkColsStr = string.Join(", ", pkCols.Select(_ => $"\"{_}\""));
 
 
-        using (TextReader tr = new StreamReader(tmpFile.FullName))
+        //Create the staging table
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS _staging", _cancellationToken);
+
+        sql = @$"CREATE UNLOGGED TABLE _staging (LIKE ""{tableName}"")";
+        await db.Database.ExecuteSqlRawAsync(sql, _cancellationToken);
+
+        sql = $"ALTER TABLE _staging ADD PRIMARY KEY ({pkColsStr})";
+        await db.Database.ExecuteSqlRawAsync(sql, _cancellationToken);
+
+
+        //Upload to staging with no timeout
+        var bc = new BulkConfig
         {
-            //Ignore source headers
-            tr.ReadLine();
+            BulkCopyTimeout = 0,
+            CustomDestinationTableName = "_staging"
+        };
 
-            using var dstStream = new StreamWriter(formattedFile.FullName);
+        List<T> inserts = [];
 
-            bool headersDone = false;
-            string? line;
-            while ((line = tr.ReadLine()) != null)
+        //Open the file to read
+        using TextReader tr = new StreamReader(tmpFile.FullName);
+        tr.ReadLine();
+        string? line;
+        while ((line = tr.ReadLine()) != null)
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+
+            var entity = createEntity(line.Split('\t'));
+            if (entity != null)
+                inserts.Add(entity);
+
+            //Don't use too much memory
+            if(inserts.Count >= _chunkSize)
             {
-                _cancellationToken.ThrowIfCancellationRequested();
-
-                var entity = createEntity(line.Split('\t'));
-                if (entity != null)
-                {
-                    if (!headersDone)
-                    {
-                        dstStream.WriteLine(entity.ToHeaders());
-                        headersDone = true;
-                    }
-
-                    dstStream.WriteLine(entity.ToCSV());
-                }
+                await db.BulkInsertAsync(inserts, bc, cancellationToken: _cancellationToken);
+                inserts.Clear();
             }
         }
-
 
 #if !DEBUG
         tmpFile.TryDelete();    
 #endif
 
 
-        using var scope = _serviceScopeFactory.CreateScope();
-        using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.SetCommandTimeout(TimeSpan.FromDays(1));
-        var tn = db.GetTableName<T>();
-        var cols = db.GetColumnNames<T>();
-        string colNames = string.Join(", ", cols.Select(_ => $"\"{_}\""));
+        //Any remaining inserts
+        if (inserts.Count > 0)
+            await db.BulkInsertAsync(inserts, bc, cancellationToken: _cancellationToken);
 
+        
+        /*
+            MERGE INTO wines w
+            USING new_wine_list s
+            ON s.winename = w.winename
+            WHEN NOT MATCHED BY TARGET THEN
+                INSERT VALUES(s.winename, s.stock)
+            WHEN MATCHED AND w.stock != s.stock THEN
+                UPDATE SET stock = s.stock
+            WHEN NOT MATCHED BY SOURCE THEN
+                DELETE; 
+        */
 
-        var pkCols = db.GetPrimaryKeyColumnNames<T>();
-        var pkNames = string.Join(", ", pkCols.Select(_ => $"\"{_}\""));
-
-        var nkCols = cols.ToList();
-        nkCols.RemoveAll(_ => pkCols.Contains(_));
-
+        //Merge
         StringBuilder sb = new();
-        sb.AppendLine("BEGIN;");
-        sb.AppendLine();
-
-        sb.AppendLine(@$"DROP TABLE IF EXISTS ""STAGING_{tn}"";");
-        sb.AppendLine();
-
-        sb.AppendLine(@$"CREATE TEMP TABLE ""STAGING_{tn}"" (LIKE ""{tn}"");");
-        sb.AppendLine();
-
-        sb.AppendLine(@$"COPY ""STAGING_{tn}"" FROM '{formattedFile.FullName}' DELIMITER ',' CSV HEADER;");
-        sb.AppendLine();
-
-        sb.AppendLine(@$"DELETE FROM ""{tn}"" WHERE ({pkNames}) NOT IN (SELECT {pkNames} FROM ""STAGING_{tn}"");");
-        sb.AppendLine();
-
-        sb.AppendLine(@$"INSERT INTO ""{tn}"" ({colNames})");
-        sb.AppendLine(@$"(SELECT {colNames} FROM ""STAGING_{tn}"")");
-        sb.AppendLine($@"ON CONFLICT ({pkNames}) DO UPDATE SET");
-        sb.AppendLine(string.Join(", ", nkCols.Select(_ => $@"""{_}"" = EXCLUDED.""{_}""")) + ";");
-        sb.AppendLine();
-
-        sb.AppendLine(@$"DROP TABLE IF EXISTS ""STAGING_{tn}"";");
-        sb.AppendLine();
-
-        sb.AppendLine("COMMIT;");
+        sb.AppendLine(@$"MERGE INTO ""{tableName}"" t");
+        sb.AppendLine("USING _staging s");
+        sb.AppendLine("ON " + string.Join(" AND ", pkCols.Select(_ => $"s.\"{_}\" = t.\"{_}\"")));
+        sb.AppendLine("WHEN NOT MATCHED BY TARGET THEN");
+        sb.AppendLine($"    INSERT VALUES({string.Join(", ", cols.Select(_ => $"s.\"{_}\""))})");
+        sb.AppendLine("WHEN MATCHED THEN");
+        sb.AppendLine($"    UPDATE SET {string.Join(", ", nkCols.Select(_ => $"\"{_}\" = s.\"{_}\""))}");
+        sb.AppendLine("WHEN NOT MATCHED BY SOURCE THEN");
+        sb.AppendLine("    DELETE;");
 
         await db.Database.ExecuteSqlRawAsync(sb.ToString(), _cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS _staging", _cancellationToken);
     }
 
 

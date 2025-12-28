@@ -13,7 +13,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace IMDB.API.ApiService.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251226062243_Initial")]
+    [Migration("20251227221644_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -21,7 +21,7 @@ namespace IMDB.API.ApiService.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "9.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -44,8 +44,9 @@ namespace IMDB.API.ApiService.Migrations
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.ExternalData", b =>
                 {
-                    b.Property<string>("TConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("TConstId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<DateOnly?>("Date")
                         .HasColumnType("date");
@@ -58,20 +59,21 @@ namespace IMDB.API.ApiService.Migrations
 
                     b.Property<string>("MPAA_Rating")
                         .HasColumnType("text")
-                        .HasJsonPropertyName("mpaaRating");
+                        .HasAnnotation("Relational:JsonPropertyName", "mpaaRating");
 
                     b.Property<string>("Plot")
                         .HasColumnType("text");
 
-                    b.HasKey("TConst");
+                    b.HasKey("TConstId");
 
                     b.ToTable("ExternalData");
                 });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.NameBasic", b =>
                 {
-                    b.Property<string>("NConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("NConstId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<int?>("BirthYear")
                         .HasColumnType("integer");
@@ -89,7 +91,7 @@ namespace IMDB.API.ApiService.Migrations
                     b.PrimitiveCollection<List<string>>("PrimaryProfessions")
                         .HasColumnType("text[]");
 
-                    b.HasKey("NConst");
+                    b.HasKey("NConstId");
 
                     b.HasIndex("PrimaryName")
                         .HasAnnotation("Npgsql:TsVectorConfig", "english");
@@ -101,14 +103,14 @@ namespace IMDB.API.ApiService.Migrations
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleAka", b =>
                 {
-                    b.Property<string>("TConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("TConstId")
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<int>("Ordering")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Title")
-                        .HasColumnType("text");
+                    b.Property<long>("TitleHashId")
+                        .HasColumnType("bigint");
 
                     b.PrimitiveCollection<List<string>>("Attributes")
                         .HasColumnType("text[]");
@@ -122,18 +124,23 @@ namespace IMDB.API.ApiService.Migrations
                     b.Property<string>("Region")
                         .HasColumnType("text");
 
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.PrimitiveCollection<List<string>>("Types")
                         .HasColumnType("text[]");
 
-                    b.HasKey("TConst", "Ordering", "Title");
+                    b.HasKey("TConstId", "Ordering", "TitleHashId");
 
                     b.ToTable("TitleAkas");
                 });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleBasic", b =>
                 {
-                    b.Property<string>("TConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("TConstId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<int?>("EndYear")
                         .HasColumnType("integer");
@@ -152,8 +159,8 @@ namespace IMDB.API.ApiService.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<long?>("RuntimeMinutes")
-                        .HasColumnType("bigint");
+                    b.Property<int?>("RuntimeMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("StartYear")
                         .HasColumnType("integer");
@@ -162,7 +169,7 @@ namespace IMDB.API.ApiService.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.HasKey("TConst");
+                    b.HasKey("TConstId");
 
                     b.HasIndex("PrimaryTitle", "OriginalTitle")
                         .HasAnnotation("Npgsql:TsVectorConfig", "english");
@@ -174,8 +181,9 @@ namespace IMDB.API.ApiService.Migrations
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleCrew", b =>
                 {
-                    b.Property<string>("TConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("TConstId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(20,0)");
 
                     b.PrimitiveCollection<List<string>>("Directors")
                         .HasColumnType("text[]");
@@ -183,41 +191,41 @@ namespace IMDB.API.ApiService.Migrations
                     b.PrimitiveCollection<List<string>>("Writers")
                         .HasColumnType("text[]");
 
-                    b.HasKey("TConst");
+                    b.HasKey("TConstId");
 
                     b.ToTable("TitleCrews");
                 });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleEpisode", b =>
                 {
-                    b.Property<string>("TConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("TConstId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<int?>("EpisodeNumber")
                         .HasColumnType("integer");
 
-                    b.Property<string>("ParentTConst")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<decimal>("ParentTConstId")
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<int?>("SeasonNumber")
                         .HasColumnType("integer");
 
-                    b.HasKey("TConst");
+                    b.HasKey("TConstId");
 
                     b.ToTable("TitleEpisodes");
                 });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitlePrincipal", b =>
                 {
-                    b.Property<string>("TConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("TConstId")
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<int>("Ordering")
                         .HasColumnType("integer");
 
-                    b.Property<string>("NConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("NConstId")
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<string>("Category")
                         .IsRequired()
@@ -229,25 +237,48 @@ namespace IMDB.API.ApiService.Migrations
                     b.Property<string>("Job")
                         .HasColumnType("text");
 
-                    b.HasKey("TConst", "Ordering", "NConst");
+                    b.HasKey("TConstId", "Ordering", "NConstId");
 
                     b.ToTable("TitlePrincipals");
                 });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleRating", b =>
                 {
-                    b.Property<string>("TConst")
-                        .HasColumnType("text");
+                    b.Property<decimal>("TConstId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<float>("AverageWeighting")
                         .HasColumnType("real");
 
-                    b.Property<int>("NumVotes")
-                        .HasColumnType("integer");
+                    b.Property<long>("NumVotes")
+                        .HasColumnType("bigint");
 
-                    b.HasKey("TConst");
+                    b.HasKey("TConstId");
 
                     b.ToTable("TitleRatings");
+                });
+
+            modelBuilder.Entity("IMDB.API.ApiService.Data.Models.UpdateHistory", b =>
+                {
+                    b.Property<string>("TableName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("LastFinished")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastStarted")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool?>("Success")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("TableName");
+
+                    b.ToTable("UpdateHistories");
                 });
 #pragma warning restore 612, 618
         }
