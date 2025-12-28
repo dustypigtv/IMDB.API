@@ -70,8 +70,13 @@ public class DailyUpdater : IHostedService
                 .Where(_ => _.Id == 1)
                 .FirstOrDefaultAsync(_cancellationToken) ?? new();
 
-            if (DateTime.UtcNow > config.LastUpdate.AddDays(1))
-                shouldDoWork = true;
+
+            //Schedule for same time daily - I'm picking 2 pm UTC out of thin air
+            var nextRunTime = new DateTime(config.LastUpdate.Year, config.LastUpdate.Month, config.LastUpdate.Day, 14, 0, 0, DateTimeKind.Utc);
+            if (config.LastUpdate > nextRunTime)
+                nextRunTime = nextRunTime.AddDays(1);
+
+            shouldDoWork = DateTime.UtcNow >= nextRunTime;
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -86,37 +91,33 @@ public class DailyUpdater : IHostedService
 
         if (shouldDoWork)
         {
-            bool success = false;
+            try
+            {
+                using var scope = _serviceScopeFactory.CreateScope();
+                using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var config = await db.Config
+                    .Where(_ => _.Id == 1)
+                    .FirstOrDefaultAsync(_cancellationToken);
+
+                config ??= db.Config.Add(new Config { Id = 1 }).Entity;
+                config.LastUpdate = DateTime.UtcNow;
+                await db.SaveChangesAsync(_cancellationToken);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed updating LastUpdate in database");
+            }
+
+
             try
             {
                 await DoWork();
-                success = true;
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "DoWork failed");
-            }
-
-            if (success)
-            {
-                try
-                {
-                    using var scope = _serviceScopeFactory.CreateScope();
-                    using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var config = await db.Config
-                        .Where(_ => _.Id == 1)
-                        .FirstOrDefaultAsync(_cancellationToken);
-
-                    config ??= db.Config.Add(new Config { Id = 1 }).Entity;
-                    config.LastUpdate = DateTime.UtcNow;
-                    await db.SaveChangesAsync(_cancellationToken);
-                }
-                catch (OperationCanceledException) { }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed updating LastUpdate in database");
-                }
             }
         }
 
