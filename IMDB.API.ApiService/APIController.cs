@@ -240,13 +240,21 @@ public class APIController(AppDbContext db) : ControllerBase
     /// </summary>
     [HttpGet]
     [ApiExplorerSettings(IgnoreApi = true)]
-    public async Task<ActionResult<ExternalData>> NextExternalToFind(string privilegedApiKey)
+    public async Task<ActionResult<IEnumerable<ExternalData>>> NextExternalToFind(string privilegedApiKey, ushort? count)
     {
         if (!_privilegedKey.HasValue())
             throw new Exception(PRIVILEGED_KEY_NAME + " environment variable not set");
 
         if (_privilegedKey != privilegedApiKey)
             return new StatusCodeResult(StatusCodes.Status401Unauthorized);
+
+        //Default of 1
+        if (count == null || count == 0)
+            count = 1;
+
+        //No more than 1k
+        if (count > 1000)
+            count = 1000;
 
         var q = from tb in db.TitleBasics.Where(_ => ExternalDataFilter.Contains(_.TitleType))
                 join tr in db.TitleRatings on tb.TConstId equals tr.TConstId into lj1
@@ -265,13 +273,14 @@ public class APIController(AppDbContext db) : ControllerBase
             .OrderBy(_ => _.LastUpdated)
             .ThenByDescending(_ => _.NumVotes)
             .ThenBy(_ => _.TitleBasic.TConstId)
-            .FirstOrDefaultAsync();
+            .Take(count.Value)
+            .ToListAsync();
 
-        if (queryResponse == null)
+        if (queryResponse == null || queryResponse.Count == 0)
             return NotFound();
 
-        var ret = queryResponse.ExternalData ?? new ExternalData { TConstId = queryResponse.TitleBasic.TConstId };
-        ret.TConst = ret.TConstId.ToTConst();
+        var ret = queryResponse.Select(_ => _.ExternalData ?? new ExternalData { TConstId = _.TitleBasic.TConstId }).ToList();
+        ret.ForEach(_ => _.TConst = _.TConstId.ToTConst());
 
         return Ok(ret);
     }
@@ -282,7 +291,7 @@ public class APIController(AppDbContext db) : ControllerBase
     /// </summary>
     [HttpPost]
     [ApiExplorerSettings(IgnoreApi = true)]
-    public async Task<ActionResult> UpdateExternalData(string privilegedApiKey, ExternalData externalData)
+    public async Task<ActionResult> UpdateExternalData(string privilegedApiKey, List<ExternalData> externalDatas)
     {
         if (!_privilegedKey.HasValue())
             throw new Exception(PRIVILEGED_KEY_NAME + " environment variable not set");
@@ -290,29 +299,46 @@ public class APIController(AppDbContext db) : ControllerBase
         if (_privilegedKey != privilegedApiKey)
             return new StatusCodeResult(StatusCodes.Status401Unauthorized);
 
+        if (externalDatas.Count == 0)
+            return Ok();
 
-        if (!externalData.TConst.HasValue())
-            return BadRequest();
-
-        externalData.TConstId = externalData.TConst.ToNumId();
-        var entity = await db.ExternalData
-            .Where(_ => _.TConstId == externalData.TConstId)
-            .FirstOrDefaultAsync();
-
-        if (entity == null)
+        foreach (var externalData in externalDatas)
         {
-            entity = db.ExternalData.Add(externalData).Entity;
-        }
-        else
-        {
-            entity.Date = externalData.Date ?? entity.Date;
-            entity.ImageUrl = externalData.ImageUrl.HasValue() ? externalData.ImageUrl : entity.ImageUrl;
-            entity.MPAA_Rating = externalData.MPAA_Rating.HasValue() ? externalData.MPAA_Rating : entity.MPAA_Rating;
-            entity.Plot = externalData.Plot.HasValue() ? externalData.Plot : entity.Plot;
+            if (!externalData.TConst.HasValue())
+                return BadRequest();
+            externalData.TConstId = externalData.TConst.ToNumId();
         }
 
-        entity.LastUpdated = DateTime.UtcNow;
-        await db.SaveChangesAsync();
+        while (externalDatas.Count > 0)
+        {
+            List<ExternalData> batch = [.. externalDatas.Take(1000)];
+            List<ulong> batchIds = [.. batch.Select(_ => _.TConstId).Distinct()];
+            externalDatas.RemoveAll(_ => batchIds.Contains(_.TConstId));
+
+            var entities = await db.ExternalData
+                .Where(_ => batchIds.Contains(_.TConstId))
+                .ToListAsync();
+            
+            foreach(var item in batch)
+            {
+                var entity = entities.FirstOrDefault(_ => _.TConstId == item.TConstId);
+                if (entity == null)
+                {
+                    entity = db.ExternalData.Add(item).Entity;
+                }
+                else
+                {
+                    entity.Date = item.Date ?? entity.Date;
+                    entity.ImageUrl = item.ImageUrl.HasValue() ? item.ImageUrl : entity.ImageUrl;
+                    entity.MPAA_Rating = item.MPAA_Rating.HasValue() ? item.MPAA_Rating : entity.MPAA_Rating;
+                    entity.Plot = item.Plot.HasValue() ? item.Plot : entity.Plot;
+                }
+
+                entity.LastUpdated = DateTime.UtcNow;
+            }
+
+            await db.SaveChangesAsync();
+        }
 
         return Ok();
     }

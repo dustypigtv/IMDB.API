@@ -6,7 +6,10 @@ var builder = DistributedApplication.CreateBuilder(args);
 var env = builder.AddDockerComposeEnvironment("env");
 
 var cache = builder.AddRedis("cache")
-    .WithRedisInsight()
+    .WithRedisInsight(c =>
+    {
+        c.PublishAsContainer(); 
+    })
     .WithDataVolume("redis", false)
     .WithLifetime(ContainerLifetime.Persistent);
 
