@@ -1,6 +1,7 @@
 ﻿using IMDB.API.ApiService.Data;
 using IMDB.API.ApiService.Data.Models;
 using IMDB.API.ApiService.Responses;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
@@ -240,6 +241,7 @@ public class APIController(AppDbContext db) : ControllerBase
     /// </summary>
     [HttpGet]
     [ApiExplorerSettings(IgnoreApi = true)]
+    [DisableRequestTimeout]
     public async Task<ActionResult<IEnumerable<ExternalData>>> NextExternalToFind(string privilegedApiKey, ushort? count)
     {
         if (!_privilegedKey.HasValue())
@@ -291,6 +293,7 @@ public class APIController(AppDbContext db) : ControllerBase
     /// </summary>
     [HttpPost]
     [ApiExplorerSettings(IgnoreApi = true)]
+    [DisableRequestTimeout]
     public async Task<ActionResult> UpdateExternalData(string privilegedApiKey, List<ExternalData> externalDatas)
     {
         if (!_privilegedKey.HasValue())
