@@ -21,7 +21,14 @@ public class APIController(AppDbContext db) : ControllerBase
 
     public const string PRIVILEGED_KEY_NAME = "PRIVILEGED_API_KEY";
 
-    static readonly string[] ExternalDataFilter = new string[] { "movie", "tvMovie", "tvSeries", "tvMiniSeries", "tvEpisode" };
+
+
+    //The ParentTConstId needs to be nullable for the TitleEpisodes part of the NextExternalToFind query,
+    //but can't do that with an anonymous type in LINQ.
+    //So this wrapper exists
+    class DTO { public ulong? ParentTConstId { get; set; } };
+
+
 
 
     private readonly string _privilegedKey = Environment.GetEnvironmentVariable(PRIVILEGED_KEY_NAME) + string.Empty;
@@ -242,7 +249,7 @@ public class APIController(AppDbContext db) : ControllerBase
     [HttpGet]
     [ApiExplorerSettings(IgnoreApi = true)]
     [DisableRequestTimeout]
-    public async Task<ActionResult<IEnumerable<ExternalData>>> NextExternalToFind(string privilegedApiKey, ushort? count)
+    public async Task<ActionResult<IEnumerable<UpdateExternalData>>> NextExternalToFind(string privilegedApiKey, ushort? count)
     {
         if (!_privilegedKey.HasValue())
             throw new Exception(PRIVILEGED_KEY_NAME + " environment variable not set");
@@ -258,17 +265,22 @@ public class APIController(AppDbContext db) : ControllerBase
         if (count > 1000)
             count = 1000;
 
-        var q = from tb in db.TitleBasics.Where(_ => ExternalDataFilter.Contains(_.TitleType))
+
+        
+        var q = from tb in db.TitleBasics.Where(_ => _.TitleType != "videoGame")
                 join tr in db.TitleRatings on tb.TConstId equals tr.TConstId into lj1
                 from tr in lj1.DefaultIfEmpty()
                 join ed in db.ExternalData on tb.TConstId equals ed.TConstId into lj2
                 from ed in lj2.DefaultIfEmpty()
+                join ec in db.TitleEpisodes.Select(_ => _.ParentTConstId).Distinct().Select(_ => new DTO() { ParentTConstId = _ }) on tb.TConstId equals ec.ParentTConstId into lj3
+                from ec in lj3.DefaultIfEmpty()
                 select new
                 {
                     TitleBasic = tb,
                     NumVotes = tr == null ? 0 : tr.NumVotes,
                     ExternalData = ed,
-                    LastUpdated = ed == null ? DateTime.MinValue : ed.LastUpdated
+                    LastUpdated = ed == null ? DateTime.MinValue : ed.LastUpdated,
+                    HasEpisodes = ec.ParentTConstId.HasValue
                 };
 
         var queryResponse = await q
@@ -281,8 +293,26 @@ public class APIController(AppDbContext db) : ControllerBase
         if (queryResponse == null || queryResponse.Count == 0)
             return NotFound();
 
-        var ret = queryResponse.Select(_ => _.ExternalData ?? new ExternalData { TConstId = _.TitleBasic.TConstId }).ToList();
-        ret.ForEach(_ => _.TConst = _.TConstId.ToTConst());
+        var ret = new List<UpdateExternalData>();
+        foreach(var item in queryResponse)
+        {
+            var ued = new UpdateExternalData
+            {
+                TConst = item.TitleBasic.TConstId.ToTConst(),
+                TitleType = item.TitleBasic.TitleType,
+                HasEpisodes = item.HasEpisodes
+            };
+
+            if(item.ExternalData != null)
+            {
+                ued.Date = item.ExternalData.Date;
+                ued.ImageUrl = item.ExternalData.ImageUrl;
+                ued.MPAA_Rating = item.ExternalData.MPAA_Rating;
+                ued.Plot = item.ExternalData.Plot;
+            }
+
+            ret.Add(ued);
+        }
 
         return Ok(ret);
     }
@@ -294,6 +324,7 @@ public class APIController(AppDbContext db) : ControllerBase
     [HttpPost]
     [ApiExplorerSettings(IgnoreApi = true)]
     [DisableRequestTimeout]
+    [RequestSizeLimit(104857600)] // Handle requests up to 100 MB
     public async Task<ActionResult> UpdateExternalData(string privilegedApiKey, List<ExternalData> externalDatas)
     {
         if (!_privilegedKey.HasValue())
@@ -321,8 +352,8 @@ public class APIController(AppDbContext db) : ControllerBase
             var entities = await db.ExternalData
                 .Where(_ => batchIds.Contains(_.TConstId))
                 .ToListAsync();
-            
-            foreach(var item in batch)
+
+            foreach (var item in batch)
             {
                 var entity = entities.FirstOrDefault(_ => _.TConstId == item.TConstId);
                 if (entity == null)
@@ -346,3 +377,5 @@ public class APIController(AppDbContext db) : ControllerBase
         return Ok();
     }
 }
+
+

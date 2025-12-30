@@ -22,5 +22,6 @@ public class ExternalData
     [JsonPropertyName("mpaaRating")]
     public string? MPAA_Rating { get; set; }
 
+    [JsonIgnore]
     public DateTime LastUpdated { get; set; }
 }
