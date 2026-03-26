@@ -26,7 +26,7 @@ public class APIController(AppDbContext db) : ControllerBase
     //The ParentTConstId needs to be nullable for the TitleEpisodes part of the NextExternalToFind query,
     //but can't do that with an anonymous type in LINQ.
     //So this wrapper exists
-    class DTO { public ulong? ParentTConstId { get; set; } };
+    class DTO { public string? ParentTConst { get; set; } };
 
 
 
@@ -42,17 +42,16 @@ public class APIController(AppDbContext db) : ControllerBase
             return NotFound();
 
         tConst = tConst.ToLower();
-        var tConstId = tConst.ToNumId();
 
-        var q = from titleBasic in db.TitleBasics.Where(_ => _.TConstId == tConstId)
+        var q = from titleBasic in db.TitleBasics.Where(_ => _.TConst == tConst)
 
-                join titleCrew in db.TitleCrews on titleBasic.TConstId equals titleCrew.TConstId into titleCrewLJ
+                join titleCrew in db.TitleCrews on titleBasic.TConst equals titleCrew.TConst into titleCrewLJ
                 from titleCrew in titleCrewLJ.DefaultIfEmpty()
 
-                join titleRating in db.TitleRatings on titleBasic.TConstId equals titleRating.TConstId into titleRatingLJ
+                join titleRating in db.TitleRatings on titleBasic.TConst equals titleRating.TConst into titleRatingLJ
                 from titleRating in titleRatingLJ.DefaultIfEmpty()
 
-                join externalData in db.ExternalData on titleBasic.TConstId equals externalData.TConstId into externalDataLJ
+                join externalData in db.ExternalData on titleBasic.TConst equals externalData.TConst into externalDataLJ
                 from externalData in externalDataLJ.DefaultIfEmpty()
 
                 select new Title
@@ -75,7 +74,7 @@ public class APIController(AppDbContext db) : ControllerBase
 
         ret.Akas = await db.TitleAkas
             .AsNoTracking()
-            .Where(_ => _.TConstId == tConstId)
+            .Where(_ => _.TConst == tConst)
             .ToListAsync();
         if (ret.Akas?.Count > 0)
             ret.Akas.ForEach(_ => _.TConst = tConst);
@@ -85,38 +84,20 @@ public class APIController(AppDbContext db) : ControllerBase
 
         ret.Episodes = await db.TitleEpisodes
             .AsNoTracking()
-            .Where(_ => _.ParentTConstId == tConstId)
+            .Where(_ => _.ParentTConst == tConst)
             .ToListAsync();
         if (ret.Episodes?.Count > 0)
-        {
-            ret.Episodes.ForEach(_ =>
-            {
-                _.TConst = _.TConstId.ToTConst();
-                _.ParentTConst = tConst;
-            });
-        }
+            ret.Episodes.ForEach(_ => _.ParentTConst = tConst);
         else
-        {
             ret.Episodes = null;
-        }
 
 
         ret.Principals = await db.TitlePrincipals
             .AsNoTracking()
-            .Where(_ => _.TConstId == tConstId)
+            .Where(_ => _.TConst == tConst)
             .ToListAsync();
-        if (ret.Principals?.Count > 0)
-        {
-            ret.Principals.ForEach(_ =>
-            {
-                _.TConst = tConst;
-                _.NConst = _.NConstId.ToNConst();
-            });
-        }
-        else
-        {
+        if (ret.Principals?.Count == 0)
             ret.Principals = null;
-        }
 
         return Ok(ret);
     }
@@ -131,11 +112,10 @@ public class APIController(AppDbContext db) : ControllerBase
             return NotFound();
 
         nConst = nConst.ToLower();
-        var nConstId = nConst.ToNumId();
 
         var ret = await db.NameBasics
             .AsNoTracking()
-            .Where(_ => _.NConstId == nConstId)
+            .Where(_ => _.NConst == nConst)
             .FirstOrDefaultAsync();
 
         if (ret == null)
@@ -175,7 +155,7 @@ public class APIController(AppDbContext db) : ControllerBase
             });
 
         var q3 = from item in q2
-                 join rating in db.TitleRatings on item.Val.TConstId equals rating.TConstId into lj
+                 join rating in db.TitleRatings on item.Val.TConst equals rating.TConst into lj
                  from rating in lj.DefaultIfEmpty()
                  select new TitleSearchResult
                  {
@@ -196,11 +176,6 @@ public class APIController(AppDbContext db) : ControllerBase
         if (ret.Count == 0)
             return NotFound();
 
-        ret.ForEach(_ =>
-        {
-            _.Basic.TConst = _.Basic.TConstId.ToTConst();
-            _.Rating?.TConst = _.Rating.TConstId.ToTConst();
-        });
 
         return Ok(ret);
     }
@@ -236,8 +211,6 @@ public class APIController(AppDbContext db) : ControllerBase
         if (ret.Count == 0)
             return NotFound();
 
-        ret.ForEach(_ => _.Val.NConst = _.Val.NConstId.ToNConst());
-
         return Ok(ret.Select(_ => _.Val));
     }
 
@@ -266,13 +239,13 @@ public class APIController(AppDbContext db) : ControllerBase
             count = 1000;
 
 
-        
+
         var q = from tb in db.TitleBasics.Where(_ => _.TitleType != "videoGame")
-                join tr in db.TitleRatings on tb.TConstId equals tr.TConstId into lj1
+                join tr in db.TitleRatings on tb.TConst equals tr.TConst into lj1
                 from tr in lj1.DefaultIfEmpty()
-                join ed in db.ExternalData on tb.TConstId equals ed.TConstId into lj2
+                join ed in db.ExternalData on tb.TConst equals ed.TConst into lj2
                 from ed in lj2.DefaultIfEmpty()
-                join ec in db.TitleEpisodes.Select(_ => _.ParentTConstId).Distinct().Select(_ => new DTO() { ParentTConstId = _ }) on tb.TConstId equals ec.ParentTConstId into lj3
+                join ec in db.TitleEpisodes.Select(_ => _.ParentTConst).Distinct().Select(_ => new DTO() { ParentTConst = _ }) on tb.TConst equals ec.ParentTConst into lj3
                 from ec in lj3.DefaultIfEmpty()
                 select new
                 {
@@ -280,13 +253,13 @@ public class APIController(AppDbContext db) : ControllerBase
                     NumVotes = tr == null ? 0 : tr.NumVotes,
                     ExternalData = ed,
                     LastUpdated = ed == null ? DateTime.MinValue : ed.LastUpdated,
-                    HasEpisodes = ec.ParentTConstId.HasValue
+                    HasEpisodes = ec.ParentTConst.HasValue()
                 };
 
         var queryResponse = await q
             .OrderBy(_ => _.LastUpdated)
             .ThenByDescending(_ => _.NumVotes)
-            .ThenBy(_ => _.TitleBasic.TConstId)
+            .ThenBy(_ => _.TitleBasic.TConst)
             .Take(count.Value)
             .ToListAsync();
 
@@ -294,16 +267,16 @@ public class APIController(AppDbContext db) : ControllerBase
             return NotFound();
 
         var ret = new List<UpdateExternalData>();
-        foreach(var item in queryResponse)
+        foreach (var item in queryResponse)
         {
             var ued = new UpdateExternalData
             {
-                TConst = item.TitleBasic.TConstId.ToTConst(),
+                TConst = item.TitleBasic.TConst,
                 TitleType = item.TitleBasic.TitleType,
                 HasEpisodes = item.HasEpisodes
             };
 
-            if(item.ExternalData != null)
+            if (item.ExternalData != null)
             {
                 ued.Date = item.ExternalData.Date;
                 ued.ImageUrl = item.ExternalData.ImageUrl;
@@ -340,22 +313,21 @@ public class APIController(AppDbContext db) : ControllerBase
         {
             if (!externalData.TConst.HasValue())
                 return BadRequest();
-            externalData.TConstId = externalData.TConst.ToNumId();
         }
 
         while (externalDatas.Count > 0)
         {
             List<ExternalData> batch = [.. externalDatas.Take(1000)];
-            List<ulong> batchIds = [.. batch.Select(_ => _.TConstId).Distinct()];
-            externalDatas.RemoveAll(_ => batchIds.Contains(_.TConstId));
+            List<string> batchIds = [.. batch.Select(_ => _.TConst).Distinct()];
+            externalDatas.RemoveAll(_ => batchIds.Contains(_.TConst));
 
             var entities = await db.ExternalData
-                .Where(_ => batchIds.Contains(_.TConstId))
+                .Where(_ => batchIds.Contains(_.TConst))
                 .ToListAsync();
 
             foreach (var item in batch)
             {
-                var entity = entities.FirstOrDefault(_ => _.TConstId == item.TConstId);
+                var entity = entities.FirstOrDefault(_ => _.TConst == item.TConst);
                 if (entity == null)
                 {
                     entity = db.ExternalData.Add(item).Entity;

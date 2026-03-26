@@ -12,11 +12,11 @@ public static class Extensions
 
     public static long Hash(this string s) => BitConverter.ToInt64(_hasher.ComputeHash(Encoding.UTF8.GetBytes(s)));
 
-    public static ulong ToNumId(this string s) => ulong.Parse(s[2..]);
+    //public static ulong ToNumId(this string s) => ulong.Parse(s[2..]);
 
-    public static string ToTConst(this ulong v) => "tt" + v.ToString().PadLeft(7, '0');
+    //public static string ToTConst(this ulong v) => "tt" + v.ToString().PadLeft(7, '0');
 
-    public static string ToNConst(this ulong v) => "nm" + v.ToString().PadLeft(7, '0');
+    //public static string ToNConst(this ulong v) => "nm" + v.ToString().PadLeft(7, '0');
 
     public static bool TryDelete(this FileInfo fileInfo)
     {
@@ -80,9 +80,9 @@ public static class Extensions
         return null;
     }
 
-    
 
-    
+
+
 
     public static List<string> GetPrimaryKeyColumnNames<TEntity>(this DbContext context) where TEntity : class
     {
@@ -92,5 +92,5 @@ public static class Extensions
         return [.. primaryKey.Properties.Select(property => property.GetColumnName(storeObject)!)];
     }
 
-    
+
 }

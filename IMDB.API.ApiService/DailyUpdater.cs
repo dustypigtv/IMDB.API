@@ -27,7 +27,7 @@ public class DailyUpdater : IHostedService
     private readonly Timer _timer;
     private readonly ILogger<DailyUpdater> _logger;
 
-    
+
     public DailyUpdater(IServiceScopeFactory serviceScopeFactory, ILogger<DailyUpdater> logger)
     {
         _cancellationToken = _cts.Token;
@@ -121,7 +121,7 @@ public class DailyUpdater : IHostedService
             }
         }
 
-       
+
         //Reset timer to tick again in 1 minute
         try { _timer.Change(ONE_MINUTE, Timeout.Infinite); }
         catch (ObjectDisposedException) { }
@@ -231,7 +231,7 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleBasic
         {
-            TConstId = fields[0].ToNumId(),
+            TConst = fields[0],
             TitleType = fields[1],
             PrimaryTitle = fields[2],
             OriginalTitle = fields[3],
@@ -253,7 +253,7 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleAka
         {
-            TConstId = fields[0].ToNumId(),
+            TConst = fields[0],
             Ordering = ushort.Parse(fields[1]),
             TitleHashId = fields[2].Hash(),
             Title = fields[2],
@@ -277,7 +277,7 @@ public class DailyUpdater : IHostedService
         {
             var ret = new TitleCrew
             {
-                TConstId = fields[0].ToNumId(),
+                TConst = fields[0],
                 Directors = fields[1].ToStringList(),
                 Writers = fields[2].ToStringList(),
             };
@@ -297,8 +297,8 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleEpisode
         {
-            TConstId = fields[0].ToNumId(),
-            ParentTConstId = fields[1].ToNumId(),
+            TConst = fields[0],
+            ParentTConst = fields[1],
             SeasonNumber = fields[2].TryGetUShort(),
             EpisodeNumber = fields[3].TryGetUShort()
         });
@@ -314,9 +314,9 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitlePrincipal
         {
-            TConstId = fields[0].ToNumId(),
+            TConst = fields[0],
             Ordering = ushort.Parse(fields[1]),
-            NConstId = fields[2].ToNumId(),
+            NConst = fields[2],
             Category = fields[3],
             Job = fields[4] == "\\N" ? null : fields[4],
             Character = fields[5] == "\\N" ? null : fields[5]
@@ -333,7 +333,7 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new TitleRating
         {
-            TConstId = fields[0].ToNumId(),
+            TConst = fields[0],
             AverageWeighting = float.Parse(fields[1]),
             NumVotes = uint.Parse(fields[2])
         });
@@ -349,7 +349,7 @@ public class DailyUpdater : IHostedService
 
         return ImportFile(URL, fields => new NameBasic
         {
-            NConstId = fields[0].ToNumId(),
+            NConst = fields[0],
             PrimaryName = fields[1],
             BirthYear = fields[2].TryGetUShort(),
             DeathYear = fields[3].TryGetUShort(),
@@ -461,13 +461,13 @@ public class DailyUpdater : IHostedService
         //Get the db context
         using var scope = _serviceScopeFactory.CreateScope();
         using var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        
+
         //These are LONG running queries. Hence the scoped context
         db.Database.SetCommandTimeout(TimeSpan.FromDays(1));
 
         //Get info
         var tableName = db.GetTableName<T>();
-        
+
         string sql = $"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' ORDER BY ORDINAL_POSITION";
         var cols = db.Database.SqlQueryRaw<string>(sql).ToList();
 
@@ -509,7 +509,7 @@ public class DailyUpdater : IHostedService
                 inserts.Add(entity);
 
             //Don't use too much memory
-            if(inserts.Count >= _chunkSize)
+            if (inserts.Count >= _chunkSize)
             {
                 await db.BulkInsertAsync(inserts, bc, cancellationToken: _cancellationToken);
                 inserts.Clear();
@@ -525,7 +525,7 @@ public class DailyUpdater : IHostedService
         if (inserts.Count > 0)
             await db.BulkInsertAsync(inserts, bc, cancellationToken: _cancellationToken);
 
-        
+
         /*
             MERGE INTO wines w
             USING new_wine_list s
