@@ -25,22 +25,6 @@ namespace IMDB.API.ApiService.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ExternalData",
-                columns: table => new
-                {
-                    TConst = table.Column<string>(type: "text", nullable: false),
-                    Date = table.Column<DateOnly>(type: "date", nullable: true),
-                    Plot = table.Column<string>(type: "text", nullable: true),
-                    ImageUrl = table.Column<string>(type: "text", nullable: true),
-                    MPAA_Rating = table.Column<string>(type: "text", nullable: true),
-                    LastUpdated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ExternalData", x => x.TConst);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "NameBasics",
                 columns: table => new
                 {
@@ -185,9 +169,6 @@ namespace IMDB.API.ApiService.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Config");
-
-            migrationBuilder.DropTable(
-                name: "ExternalData");
 
             migrationBuilder.DropTable(
                 name: "NameBasics");

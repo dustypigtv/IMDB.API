@@ -450,10 +450,6 @@ public class DailyUpdater : IHostedService
 
     private async Task ImportFile<T>(string url, Func<string[], T?> createEntity) where T : class
     {
-        /*
-            Quick note: The BulkInsert extension doesn't work with uint, so made id's ulong 
-        */
-
         //Download
         var tmpFile = new FileInfo(Path.Combine("/tmp", Path.ChangeExtension(Path.GetFileName(url), null)));
         await DownloadFile(url, tmpFile);
@@ -497,29 +493,30 @@ public class DailyUpdater : IHostedService
         List<T> inserts = [];
 
         //Open the file to read
-        using TextReader tr = new StreamReader(tmpFile.FullName);
-        tr.ReadLine();
-        string? line;
-        while ((line = tr.ReadLine()) != null)
+        using (TextReader tr = new StreamReader(tmpFile.FullName))
         {
-            _cancellationToken.ThrowIfCancellationRequested();
-
-            var entity = createEntity(line.Split('\t'));
-            if (entity != null)
-                inserts.Add(entity);
-
-            //Don't use too much memory
-            if (inserts.Count >= _chunkSize)
+            tr.ReadLine();
+            string? line;
+            while ((line = tr.ReadLine()) != null)
             {
-                await db.BulkInsertAsync(inserts, bc, cancellationToken: _cancellationToken);
-                inserts.Clear();
+                _cancellationToken.ThrowIfCancellationRequested();
+
+                var entity = createEntity(line.Split('\t'));
+                if (entity != null)
+                    inserts.Add(entity);
+
+                //Don't use too much memory
+                if (inserts.Count >= _chunkSize)
+                {
+                    await db.BulkInsertAsync(inserts, bc, cancellationToken: _cancellationToken);
+                    inserts.Clear();
+                }
             }
         }
 
 #if !DEBUG
         tmpFile.TryDelete();    
 #endif
-
 
         //Any remaining inserts
         if (inserts.Count > 0)

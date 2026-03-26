@@ -19,20 +19,7 @@ public class APIController(AppDbContext db) : ControllerBase
 
     private const int MAX_SEARCH_RESULTS = 1_000;
 
-    public const string PRIVILEGED_KEY_NAME = "PRIVILEGED_API_KEY";
-
-
-
-    //The ParentTConstId needs to be nullable for the TitleEpisodes part of the NextExternalToFind query,
-    //but can't do that with an anonymous type in LINQ.
-    //So this wrapper exists
-    class DTO { public string? ParentTConst { get; set; } };
-
-
-
-
-    private readonly string _privilegedKey = Environment.GetEnvironmentVariable(PRIVILEGED_KEY_NAME) + string.Empty;
-
+    
     [HttpGet("{tConst}")]
     [OutputCache(Duration = ONE_DAY)]
     [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(Title))]
@@ -51,15 +38,11 @@ public class APIController(AppDbContext db) : ControllerBase
                 join titleRating in db.TitleRatings on titleBasic.TConst equals titleRating.TConst into titleRatingLJ
                 from titleRating in titleRatingLJ.DefaultIfEmpty()
 
-                join externalData in db.ExternalData on titleBasic.TConst equals externalData.TConst into externalDataLJ
-                from externalData in externalDataLJ.DefaultIfEmpty()
-
                 select new Title
                 {
                     Basic = titleBasic,
                     Crew = titleCrew,
-                    Rating = titleRating,
-                    ExternalData = externalData
+                    Rating = titleRating
                 };
 
 
@@ -70,15 +53,12 @@ public class APIController(AppDbContext db) : ControllerBase
         ret.Basic.TConst = tConst;
         ret.Crew?.TConst = tConst;
         ret.Rating?.TConst = tConst;
-        ret.ExternalData?.TConst = tConst;
 
         ret.Akas = await db.TitleAkas
             .AsNoTracking()
             .Where(_ => _.TConst == tConst)
             .ToListAsync();
-        if (ret.Akas?.Count > 0)
-            ret.Akas.ForEach(_ => _.TConst = tConst);
-        else
+        if (ret.Akas?.Count == 0)
             ret.Akas = null;
 
 
@@ -86,9 +66,7 @@ public class APIController(AppDbContext db) : ControllerBase
             .AsNoTracking()
             .Where(_ => _.ParentTConst == tConst)
             .ToListAsync();
-        if (ret.Episodes?.Count > 0)
-            ret.Episodes.ForEach(_ => _.ParentTConst = tConst);
-        else
+        if (ret.Episodes?.Count == 0)
             ret.Episodes = null;
 
 
@@ -120,8 +98,6 @@ public class APIController(AppDbContext db) : ControllerBase
 
         if (ret == null)
             return NotFound();
-
-        ret.NConst = nConst;
 
         return Ok(ret);
     }
@@ -173,9 +149,9 @@ public class APIController(AppDbContext db) : ControllerBase
             .ThenByDescending(_ => _.Basic.PrimaryTitle)
             .Take(MAX_SEARCH_RESULTS)
             .ToListAsync();
+        
         if (ret.Count == 0)
             return NotFound();
-
 
         return Ok(ret);
     }
@@ -213,141 +189,4 @@ public class APIController(AppDbContext db) : ControllerBase
 
         return Ok(ret.Select(_ => _.Val));
     }
-
-
-
-    /// <summary>
-    /// This endpoint isn't for public use
-    /// </summary>
-    [HttpGet]
-    [ApiExplorerSettings(IgnoreApi = true)]
-    [DisableRequestTimeout]
-    public async Task<ActionResult<IEnumerable<UpdateExternalData>>> NextExternalToFind(string privilegedApiKey, ushort? count)
-    {
-        if (!_privilegedKey.HasValue())
-            throw new Exception(PRIVILEGED_KEY_NAME + " environment variable not set");
-
-        if (_privilegedKey != privilegedApiKey)
-            return new StatusCodeResult(StatusCodes.Status401Unauthorized);
-
-        //Default of 1
-        if (count == null || count == 0)
-            count = 1;
-
-        //No more than 1k
-        if (count > 1000)
-            count = 1000;
-
-
-
-        var q = from tb in db.TitleBasics.Where(_ => _.TitleType != "videoGame")
-                join tr in db.TitleRatings on tb.TConst equals tr.TConst into lj1
-                from tr in lj1.DefaultIfEmpty()
-                join ed in db.ExternalData on tb.TConst equals ed.TConst into lj2
-                from ed in lj2.DefaultIfEmpty()
-                join ec in db.TitleEpisodes.Select(_ => _.ParentTConst).Distinct().Select(_ => new DTO() { ParentTConst = _ }) on tb.TConst equals ec.ParentTConst into lj3
-                from ec in lj3.DefaultIfEmpty()
-                select new
-                {
-                    TitleBasic = tb,
-                    NumVotes = tr == null ? 0 : tr.NumVotes,
-                    ExternalData = ed,
-                    LastUpdated = ed == null ? DateTime.MinValue : ed.LastUpdated,
-                    HasEpisodes = ec.ParentTConst.HasValue()
-                };
-
-        var queryResponse = await q
-            .OrderBy(_ => _.LastUpdated)
-            .ThenByDescending(_ => _.NumVotes)
-            .ThenBy(_ => _.TitleBasic.TConst)
-            .Take(count.Value)
-            .ToListAsync();
-
-        if (queryResponse == null || queryResponse.Count == 0)
-            return NotFound();
-
-        var ret = new List<UpdateExternalData>();
-        foreach (var item in queryResponse)
-        {
-            var ued = new UpdateExternalData
-            {
-                TConst = item.TitleBasic.TConst,
-                TitleType = item.TitleBasic.TitleType,
-                HasEpisodes = item.HasEpisodes
-            };
-
-            if (item.ExternalData != null)
-            {
-                ued.Date = item.ExternalData.Date;
-                ued.ImageUrl = item.ExternalData.ImageUrl;
-                ued.MPAA_Rating = item.ExternalData.MPAA_Rating;
-                ued.Plot = item.ExternalData.Plot;
-            }
-
-            ret.Add(ued);
-        }
-
-        return Ok(ret);
-    }
-
-
-    /// <summary>
-    /// This endpoint isn't for public use
-    /// </summary>
-    [HttpPost]
-    [ApiExplorerSettings(IgnoreApi = true)]
-    [DisableRequestTimeout]
-    [RequestSizeLimit(104857600)] // Handle requests up to 100 MB
-    public async Task<ActionResult> UpdateExternalData(string privilegedApiKey, List<ExternalData> externalDatas)
-    {
-        if (!_privilegedKey.HasValue())
-            throw new Exception(PRIVILEGED_KEY_NAME + " environment variable not set");
-
-        if (_privilegedKey != privilegedApiKey)
-            return new StatusCodeResult(StatusCodes.Status401Unauthorized);
-
-        if (externalDatas.Count == 0)
-            return Ok();
-
-        foreach (var externalData in externalDatas)
-        {
-            if (!externalData.TConst.HasValue())
-                return BadRequest();
-        }
-
-        while (externalDatas.Count > 0)
-        {
-            List<ExternalData> batch = [.. externalDatas.Take(1000)];
-            List<string> batchIds = [.. batch.Select(_ => _.TConst).Distinct()];
-            externalDatas.RemoveAll(_ => batchIds.Contains(_.TConst));
-
-            var entities = await db.ExternalData
-                .Where(_ => batchIds.Contains(_.TConst))
-                .ToListAsync();
-
-            foreach (var item in batch)
-            {
-                var entity = entities.FirstOrDefault(_ => _.TConst == item.TConst);
-                if (entity == null)
-                {
-                    entity = db.ExternalData.Add(item).Entity;
-                }
-                else
-                {
-                    entity.Date = item.Date ?? entity.Date;
-                    entity.ImageUrl = item.ImageUrl.HasValue() ? item.ImageUrl : entity.ImageUrl;
-                    entity.MPAA_Rating = item.MPAA_Rating.HasValue() ? item.MPAA_Rating : entity.MPAA_Rating;
-                    entity.Plot = item.Plot.HasValue() ? item.Plot : entity.Plot;
-                }
-
-                entity.LastUpdated = DateTime.UtcNow;
-            }
-
-            await db.SaveChangesAsync();
-        }
-
-        return Ok();
-    }
 }
-
-

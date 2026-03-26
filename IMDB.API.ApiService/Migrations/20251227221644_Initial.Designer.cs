@@ -42,32 +42,6 @@ namespace IMDB.API.ApiService.Migrations
                 b.ToTable("Config");
             });
 
-            modelBuilder.Entity("IMDB.API.ApiService.Data.Models.ExternalData", b =>
-            {
-                b.Property<string>("TConst")
-                    .HasColumnType("text");
-
-                b.Property<DateOnly?>("Date")
-                    .HasColumnType("date");
-
-                b.Property<string>("ImageUrl")
-                    .HasColumnType("text");
-
-                b.Property<DateTime>("LastUpdated")
-                    .HasColumnType("timestamp with time zone");
-
-                b.Property<string>("MPAA_Rating")
-                    .HasColumnType("text")
-                    .HasJsonPropertyName("mpaaRating");
-
-                b.Property<string>("Plot")
-                    .HasColumnType("text");
-
-                b.HasKey("TConst");
-
-                b.ToTable("ExternalData");
-            });
-
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.NameBasic", b =>
             {
                 b.Property<string>("NConst")

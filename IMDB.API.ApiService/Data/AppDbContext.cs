@@ -19,8 +19,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<NameBasic> NameBasics { get; set; }
 
-    public DbSet<ExternalData> ExternalData { get; set; }
-
     public DbSet<Config> Config { get; set; }
 
     public DbSet<UpdateHistory> UpdateHistories { get; set; }

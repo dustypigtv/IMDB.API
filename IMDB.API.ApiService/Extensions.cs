@@ -12,12 +12,6 @@ public static class Extensions
 
     public static long Hash(this string s) => BitConverter.ToInt64(_hasher.ComputeHash(Encoding.UTF8.GetBytes(s)));
 
-    //public static ulong ToNumId(this string s) => ulong.Parse(s[2..]);
-
-    //public static string ToTConst(this ulong v) => "tt" + v.ToString().PadLeft(7, '0');
-
-    //public static string ToNConst(this ulong v) => "nm" + v.ToString().PadLeft(7, '0');
-
     public static bool TryDelete(this FileInfo fileInfo)
     {
         try
@@ -66,24 +60,6 @@ public static class Extensions
         return null;
     }
 
-    public static int? TryGetInt(this string? s)
-    {
-        if (int.TryParse(s, out int val))
-            return val;
-        return null;
-    }
-
-    public static uint? TryGetUInt(this string? s)
-    {
-        if (uint.TryParse(s, out uint ret))
-            return ret;
-        return null;
-    }
-
-
-
-
-
     public static List<string> GetPrimaryKeyColumnNames<TEntity>(this DbContext context) where TEntity : class
     {
         var entityType = context.Model.FindEntityType(typeof(TEntity)) ?? throw new Exception("Entity type not found");
@@ -91,6 +67,4 @@ public static class Extensions
         var storeObject = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
         return [.. primaryKey.Properties.Select(property => property.GetColumnName(storeObject)!)];
     }
-
-
 }
