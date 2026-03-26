@@ -18,265 +18,260 @@ namespace IMDB.API.ApiService.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.11")
+                .HasAnnotation("ProductVersion", "10.0.1")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.Config", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+            {
+                b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("LastUpdate")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("LastUpdate")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("Config");
-                });
+                b.ToTable("Config");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.ExternalData", b =>
-                {
-                    b.Property<decimal>("TConstId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("TConst")
+                    .HasColumnType("text");
 
-                    b.Property<DateOnly?>("Date")
-                        .HasColumnType("date");
+                b.Property<DateOnly?>("Date")
+                    .HasColumnType("date");
 
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("text");
+                b.Property<string>("ImageUrl")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("LastUpdated")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("MPAA_Rating")
-                        .HasColumnType("text")
-                        .HasAnnotation("Relational:JsonPropertyName", "mpaaRating");
+                b.Property<string>("MPAA_Rating")
+                    .HasColumnType("text")
+                    .HasJsonPropertyName("mpaaRating");
 
-                    b.Property<string>("Plot")
-                        .HasColumnType("text");
+                b.Property<string>("Plot")
+                    .HasColumnType("text");
 
-                    b.HasKey("TConstId");
+                b.HasKey("TConst");
 
-                    b.ToTable("ExternalData");
-                });
+                b.ToTable("ExternalData");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.NameBasic", b =>
-                {
-                    b.Property<decimal>("NConstId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("NConst")
+                    .HasColumnType("text");
 
-                    b.Property<int?>("BirthYear")
-                        .HasColumnType("integer");
+                b.Property<int?>("BirthYear")
+                    .HasColumnType("integer");
 
-                    b.Property<int?>("DeathYear")
-                        .HasColumnType("integer");
+                b.Property<int?>("DeathYear")
+                    .HasColumnType("integer");
 
-                    b.PrimitiveCollection<List<string>>("KnownForTitles")
-                        .HasColumnType("text[]");
+                b.PrimitiveCollection<List<string>>("KnownForTitles")
+                    .HasColumnType("text[]");
 
-                    b.Property<string>("PrimaryName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("PrimaryName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.PrimitiveCollection<List<string>>("PrimaryProfessions")
-                        .HasColumnType("text[]");
+                b.PrimitiveCollection<List<string>>("PrimaryProfessions")
+                    .HasColumnType("text[]");
 
-                    b.HasKey("NConstId");
+                b.HasKey("NConst");
 
-                    b.HasIndex("PrimaryName")
-                        .HasAnnotation("Npgsql:TsVectorConfig", "english");
+                b.HasIndex("PrimaryName")
+                    .HasAnnotation("Npgsql:TsVectorConfig", "english");
 
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("PrimaryName"), "GIN");
+                NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("PrimaryName"), "GIN");
 
-                    b.ToTable("NameBasics");
-                });
+                b.ToTable("NameBasics");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleAka", b =>
-                {
-                    b.Property<decimal>("TConstId")
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("TConst")
+                    .HasColumnType("text");
 
-                    b.Property<int>("Ordering")
-                        .HasColumnType("integer");
+                b.Property<int>("Ordering")
+                    .HasColumnType("integer");
 
-                    b.Property<long>("TitleHashId")
-                        .HasColumnType("bigint");
+                b.Property<long>("TitleHashId")
+                    .HasColumnType("bigint");
 
-                    b.PrimitiveCollection<List<string>>("Attributes")
-                        .HasColumnType("text[]");
+                b.PrimitiveCollection<List<string>>("Attributes")
+                    .HasColumnType("text[]");
 
-                    b.Property<bool>("IsOriginalTitle")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsOriginalTitle")
+                    .HasColumnType("boolean");
 
-                    b.Property<string>("Language")
-                        .HasColumnType("text");
+                b.Property<string>("Language")
+                    .HasColumnType("text");
 
-                    b.Property<string>("Region")
-                        .HasColumnType("text");
+                b.Property<string>("Region")
+                    .HasColumnType("text");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.PrimitiveCollection<List<string>>("Types")
-                        .HasColumnType("text[]");
+                b.PrimitiveCollection<List<string>>("Types")
+                    .HasColumnType("text[]");
 
-                    b.HasKey("TConstId", "Ordering", "TitleHashId");
+                b.HasKey("TConst", "Ordering", "TitleHashId");
 
-                    b.ToTable("TitleAkas");
-                });
+                b.ToTable("TitleAkas");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleBasic", b =>
-                {
-                    b.Property<decimal>("TConstId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("TConst")
+                    .HasColumnType("text");
 
-                    b.Property<int?>("EndYear")
-                        .HasColumnType("integer");
+                b.Property<int?>("EndYear")
+                    .HasColumnType("integer");
 
-                    b.PrimitiveCollection<List<string>>("Genres")
-                        .HasColumnType("text[]");
+                b.PrimitiveCollection<List<string>>("Genres")
+                    .HasColumnType("text[]");
 
-                    b.Property<bool>("IsAdult")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsAdult")
+                    .HasColumnType("boolean");
 
-                    b.Property<string>("OriginalTitle")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("OriginalTitle")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<string>("PrimaryTitle")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("PrimaryTitle")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<int?>("RuntimeMinutes")
-                        .HasColumnType("integer");
+                b.Property<int?>("RuntimeMinutes")
+                    .HasColumnType("integer");
 
-                    b.Property<int?>("StartYear")
-                        .HasColumnType("integer");
+                b.Property<int?>("StartYear")
+                    .HasColumnType("integer");
 
-                    b.Property<string>("TitleType")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("TitleType")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.HasKey("TConstId");
+                b.HasKey("TConst");
 
-                    b.HasIndex("PrimaryTitle", "OriginalTitle")
-                        .HasAnnotation("Npgsql:TsVectorConfig", "english");
+                b.HasIndex("PrimaryTitle", "OriginalTitle")
+                    .HasAnnotation("Npgsql:TsVectorConfig", "english");
 
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("PrimaryTitle", "OriginalTitle"), "GIN");
+                NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("PrimaryTitle", "OriginalTitle"), "GIN");
 
-                    b.ToTable("TitleBasics");
-                });
+                b.ToTable("TitleBasics");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleCrew", b =>
-                {
-                    b.Property<decimal>("TConstId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("TConst")
+                    .HasColumnType("text");
 
-                    b.PrimitiveCollection<List<string>>("Directors")
-                        .HasColumnType("text[]");
+                b.PrimitiveCollection<List<string>>("Directors")
+                    .HasColumnType("text[]");
 
-                    b.PrimitiveCollection<List<string>>("Writers")
-                        .HasColumnType("text[]");
+                b.PrimitiveCollection<List<string>>("Writers")
+                    .HasColumnType("text[]");
 
-                    b.HasKey("TConstId");
+                b.HasKey("TConst");
 
-                    b.ToTable("TitleCrews");
-                });
+                b.ToTable("TitleCrews");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleEpisode", b =>
-                {
-                    b.Property<decimal>("TConstId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("TConst")
+                    .HasColumnType("text");
 
-                    b.Property<int?>("EpisodeNumber")
-                        .HasColumnType("integer");
+                b.Property<int?>("EpisodeNumber")
+                    .HasColumnType("integer");
 
-                    b.Property<decimal>("ParentTConstId")
-                        .HasColumnType("numeric(20,0)");
+                b.Property<string>("ParentTConst")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<int?>("SeasonNumber")
-                        .HasColumnType("integer");
+                b.Property<int?>("SeasonNumber")
+                    .HasColumnType("integer");
 
-                    b.HasKey("TConstId");
+                b.HasKey("TConst");
 
-                    b.ToTable("TitleEpisodes");
-                });
+                b.ToTable("TitleEpisodes");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitlePrincipal", b =>
-                {
-                    b.Property<decimal>("TConstId")
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("TConst")
+                    .HasColumnType("text");
 
-                    b.Property<int>("Ordering")
-                        .HasColumnType("integer");
+                b.Property<int>("Ordering")
+                    .HasColumnType("integer");
 
-                    b.Property<decimal>("NConstId")
-                        .HasColumnType("numeric(20,0)");
+                b.Property<string>("NConst")
+                    .HasColumnType("text");
 
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Category")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<string>("Character")
-                        .HasColumnType("text");
+                b.Property<string>("Character")
+                    .HasColumnType("text");
 
-                    b.Property<string>("Job")
-                        .HasColumnType("text");
+                b.Property<string>("Job")
+                    .HasColumnType("text");
 
-                    b.HasKey("TConstId", "Ordering", "NConstId");
+                b.HasKey("TConst", "Ordering", "NConst");
 
-                    b.ToTable("TitlePrincipals");
-                });
+                b.ToTable("TitlePrincipals");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.TitleRating", b =>
-                {
-                    b.Property<decimal>("TConstId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+            {
+                b.Property<string>("TConst")
+                    .HasColumnType("text");
 
-                    b.Property<float>("AverageWeighting")
-                        .HasColumnType("real");
+                b.Property<float>("AverageWeighting")
+                    .HasColumnType("real");
 
-                    b.Property<long>("NumVotes")
-                        .HasColumnType("bigint");
+                b.Property<long>("NumVotes")
+                    .HasColumnType("bigint");
 
-                    b.HasKey("TConstId");
+                b.HasKey("TConst");
 
-                    b.ToTable("TitleRatings");
-                });
+                b.ToTable("TitleRatings");
+            });
 
             modelBuilder.Entity("IMDB.API.ApiService.Data.Models.UpdateHistory", b =>
-                {
-                    b.Property<string>("TableName")
-                        .HasColumnType("text");
+            {
+                b.Property<string>("TableName")
+                    .HasColumnType("text");
 
-                    b.Property<string>("LastError")
-                        .HasColumnType("text");
+                b.Property<string>("LastError")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime?>("LastFinished")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("LastFinished")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("LastStarted")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("LastStarted")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool?>("Success")
-                        .HasColumnType("boolean");
+                b.Property<bool?>("Success")
+                    .HasColumnType("boolean");
 
-                    b.HasKey("TableName");
+                b.HasKey("TableName");
 
-                    b.ToTable("UpdateHistories");
-                });
+                b.ToTable("UpdateHistories");
+            });
 #pragma warning restore 612, 618
         }
     }
